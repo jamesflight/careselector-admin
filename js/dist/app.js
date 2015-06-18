@@ -367,7 +367,7 @@ module.exports = LoginForm;
 
 },{"react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/config.js":[function(require,module,exports){
 module.exports = {
-    API_URL: 'http://careselector-core.app:8000/api/'
+    API_URL: 'http://careselector-core.herokuapp.com/api/'
 };
 
 },{}],"/Users/user/PhpstormProjects/careselector-admin/js/src/constants.js":[function(require,module,exports){
