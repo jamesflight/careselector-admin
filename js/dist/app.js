@@ -586,8 +586,7 @@ var config = require('./../../config.js');
 var GetHeaders = require('./../auth/GetHeaders.js');
 
 module.exports = function (id, provider) {
-    console.log(provider);
-    return qwest.post(config.API_URL + 'providers/' + id, provider, GetHeaders());
+    return qwest.post(config.API_URL + 'providers/' + id, provider, {headers:GetHeaders()});
 };
 
 },{"./../../config.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/config.js","./../auth/GetHeaders.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/GetHeaders.js","qwest":"/Users/user/PhpstormProjects/careselector-admin/node_modules/qwest/src/qwest.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/BristolProvidersStore.js":[function(require,module,exports){
