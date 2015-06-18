@@ -5,10 +5,12 @@ var App = require('./App.jsx');
 var routes = require('./routes.jsx');
 var actions = require('./actions.js');
 var Fluxxor = require("fluxxor");
-var HomesStore = require('./stores/HomesStore.js');
+var BristolProvidersStore = require('./stores/BristolProvidersStore.js');
+var EditProviderStore = require('./stores/EditProviderStore.js');
 
 var stores = {
-    HomesStore: new HomesStore()
+    BristolProvidersStore: new BristolProvidersStore(),
+    EditProviderStore: new EditProviderStore()
 };
 
 var flux = new Fluxxor.Flux(stores, actions);

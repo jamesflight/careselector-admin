@@ -6,10 +6,12 @@ var App = require('./App.jsx');
 var routes = require('./routes.jsx');
 var actions = require('./actions.js');
 var Fluxxor = require("fluxxor");
-var HomesStore = require('./stores/HomesStore.js');
+var BristolProvidersStore = require('./stores/BristolProvidersStore.js');
+var EditProviderStore = require('./stores/EditProviderStore.js');
 
 var stores = {
-    HomesStore: new HomesStore()
+    BristolProvidersStore: new BristolProvidersStore(),
+    EditProviderStore: new EditProviderStore()
 };
 
 var flux = new Fluxxor.Flux(stores, actions);
@@ -17,7 +19,7 @@ Router.run(routes, function (Handler) {
     React.render(React.createElement(Handler, {flux: flux}), document.getElementById("app"));
 });
 
-},{"./App.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/App.jsx","./actions.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/actions.js","./routes.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/routes.jsx","./stores/HomesStore.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/HomesStore.js","fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/App.jsx":[function(require,module,exports){
+},{"./App.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/App.jsx","./actions.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/actions.js","./routes.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/routes.jsx","./stores/BristolProvidersStore.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/BristolProvidersStore.js","./stores/EditProviderStore.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/EditProviderStore.js","fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/App.jsx":[function(require,module,exports){
 var React = require('react');
 var Router = require('react-router'); // or var Router = ReactRouter; in browsers
 var actions = require('./actions.js');
@@ -25,7 +27,6 @@ var $ = require('jquery-browserify');
 var RouteHandler = Router.RouteHandler;
 var Fluxxor = require('fluxxor');
 var FluxMixin = Fluxxor.FluxMixin(React);
-
 
 var App = React.createClass({displayName: "App",
     mixins:[FluxMixin],
@@ -43,52 +44,213 @@ module.exports = App;
 
 },{"./actions.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/actions.js","fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","jquery-browserify":"/Users/user/PhpstormProjects/careselector-admin/node_modules/jquery-browserify/lib/jquery.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/actions.js":[function(require,module,exports){
 var constants = require('./constants.js');
-var HomesModel = require('./models/HomesModel.js');
-var GoogleApiService = require('./models/GoogleGeocodeApiService.js');
-var CareseekerService = require('./models/CareseekerService.js');
+var AttemptAuth = require('./services/auth/AttemptAuth.js');
+var SetToken = require('./services/auth/SetToken.js');
+var GetBristolProviders = require('./services/providers/GetBristolProviders.js');
+var GetProvider = require('./services/providers/GetProvider.js');
+var SaveProvider = require('./services/providers/SaveProvider.js');
 
 module.exports = {
-    loadHomes: function(filters, success) {
-        this.dispatch(constants.LOAD_HOMES);
-
-        HomesModel.get(filters, function (homes) {
-            this.dispatch(constants.LOAD_HOMES_SUCCESS, homes);
-            success();
-        }.bind(this), function (errors) {
-            this.dispatch(constants.LOAD_HOMES_ERROR, errors);
+    attemptAuth: function (credentials) {
+        this.dispatch(constants.ATTEMPT_AUTH);
+        return AttemptAuth(credentials).then(function(response) {
+            SetToken(response.token);
+            this.dispatch(constants.ATTEMPT_AUTH_SUCCESS);
         }.bind(this));
     },
-    updateFilter: function (payload) {
-        this.dispatch(constants.UPDATE_FILTER, payload);
-    },
-    removeFilter: function (name) {
-        this.dispatch(constants.REMOVE_FILTER, name);
-    },
-    addToShortlist: function (id) {
-        this.dispatch(constants.ADD_TO_SHORTLIST, id);
-    },
-    removeFromShortlist: function (id) {
-        this.dispatch(constants.REMOVE_FROM_SHORTLIST, id);
-    },
-    postShortlistToServer: function (shortlist, filters, success) {
-        this.dispatch(constants.POST_SHORTLIST_TO_SERVER);
-        HomesModel.postShortlist(shortlist, filters, function (id) {
-            this.dispatch(constants.POST_SHORTLIST_TO_SERVER_SUCCESS, id);
-            localStorage.setItem('careseeker_id', id);
-            success();
+    loadBristolProviders: function() {
+        this.dispatch(constants.LOAD_BRISTOL_PROVIDERS);
+        return GetBristolProviders().then(function(response) {
+            this.dispatch(constants.LOAD_BRISTOL_PROVIDERS_SUCCESS, response);
         }.bind(this));
     },
-    updateCareseekerEmail: function (email, success) {
-        var id = localStorage.getItem('careseeker_id');
-        this.dispatch(constants.UPDATE_CARESEEKER_EMAIL);
-        CareseekerService.updateEmail(id, email, function () {
-            this.dispatch(constants.UPDATE_CARESEEKER_EMAIL_SUCCESS);
-            success();
+    loadProviderForEditing: function (id) {
+        this.dispatch(constants.LOAD_PROVIDER_FOR_EDITING);
+        return GetProvider(id).then(function(response) {
+            this.dispatch(constants.LOAD_PROVIDER_FOR_EDITING_SUCCESS, response);
+        }.bind(this));
+    },
+    saveProvider: function (id, provider) {
+        this.dispatch(constants.SAVE_PROVIDER);
+        SaveProvider(id, provider).then(function () {
+            this.dispatch(constants.SAVE_PROVIDER_SUCCESS);
         }.bind(this));
     }
 };
 
-},{"./constants.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/constants.js","./models/CareseekerService.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/models/CareseekerService.js","./models/GoogleGeocodeApiService.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/models/GoogleGeocodeApiService.js","./models/HomesModel.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/models/HomesModel.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/Example.jsx":[function(require,module,exports){
+},{"./constants.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/constants.js","./services/auth/AttemptAuth.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/AttemptAuth.js","./services/auth/SetToken.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/SetToken.js","./services/providers/GetBristolProviders.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/GetBristolProviders.js","./services/providers/GetProvider.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/GetProvider.js","./services/providers/SaveProvider.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/SaveProvider.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/EditProviderForm.jsx":[function(require,module,exports){
+var React = require('react');
+
+var LoginForm = React.createClass({displayName: "LoginForm",
+    propTypes: {
+        provider: React.PropTypes.object,
+        onSaveProvider: React.PropTypes.func
+    },
+    getInitialState: function () {
+        return {
+            provider: {}
+        }
+    },
+    componentWillReceiveProps: function (newProps) {
+        this.setState({
+            provider:newProps.provider
+        });
+        console.log(newProps);
+    },
+    updateField: function (event) {
+        var state = this.state;
+        state.provider[event.target.dataset.field] = event.target.value;
+        this.setState(state);
+    },
+    updateCheckbox: function (event) {
+        var state = this.state;
+        state.provider[event.target.dataset.field] = event.target.checked;
+        this.setState(state);
+    },
+    saveProvider: function () {
+        this.props.onSaveProvider(this.state.provider);
+    },
+    render: function(){
+        return (
+            React.createElement("div", null, 
+
+                React.createElement("section", {className: "orange"}, 
+                    React.createElement("h1", null, "Home Details"), 
+
+                    React.createElement("h2", null, "Details"), 
+                    React.createElement("div", {className: "table-responsive"}, 
+                        React.createElement("table", {className: "table table-bordered grey"}, 
+                            React.createElement("tbody", null, 
+                                React.createElement("tr", null, 
+                                    React.createElement("th", null, "Name"), 
+                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "name", onChange: this.updateField, value: this.state.provider.name, type: "text"}))
+                                ), 
+
+                                React.createElement("tr", null, 
+                                    React.createElement("th", null, "Local Authority"), 
+                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "local_authority", onChange: this.updateField, value: this.state.provider.local_authority, type: "text"}))
+                                ), 
+                                React.createElement("tr", null, 
+                                    React.createElement("th", null, "Address 1"), 
+                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "address_1", onChange: this.updateField, value: this.state.provider.address_1, type: "text"}))
+                                ), 
+                                React.createElement("tr", null, 
+                                    React.createElement("th", null, "Address 2"), 
+                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "address_2", onChange: this.updateField, value: this.state.provider.address_2, type: "text"}))
+                                ), 
+                                React.createElement("tr", null, 
+                                    React.createElement("th", null, "Address 3"), 
+                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "address_3", onChange: this.updateField, value: this.state.provider.address_3, type: "text"}))
+                                ), 
+                                React.createElement("tr", null, 
+                                    React.createElement("th", null, "Address 4"), 
+                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "address_4", onChange: this.updateField, value: this.state.provider.address_4, type: "text"}))
+                                ), 
+                                React.createElement("tr", null, 
+                                    React.createElement("th", null, "Postcode"), 
+                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "postcode", onChange: this.updateField, value: this.state.provider.postcode, type: "text"}))
+                                ), 
+                                React.createElement("tr", null, 
+                                    React.createElement("th", null, "Phone"), 
+                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "phone", onChange: this.updateField, value: this.state.provider.phone, type: "text"}))
+                                ), 
+                                React.createElement("tr", null, 
+                                    React.createElement("th", null, "Website"), 
+                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "website", onChange: this.updateField, value: this.state.provider.website, type: "text"}))
+                                ), 
+                                React.createElement("tr", null, 
+                                    React.createElement("th", null, "Contact Name"), 
+                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "contact_name", onChange: this.updateField, value: this.state.provider.contact_name, type: "text"}))
+                                ), 
+                                React.createElement("tr", null, 
+                                    React.createElement("th", null, "CQC Score"), 
+                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "cqc_score", onChange: this.updateField, value: this.state.provider.cqc_score, type: "number"}))
+                                ), 
+                                React.createElement("tr", null, 
+                                    React.createElement("th", null, "CQC Location ID"), 
+                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "cqc_location", onChange: this.updateField, value: this.state.provider.cqc_location, type: "text"}))
+                                )
+                            )
+                        )
+                    )
+                ), 
+                React.createElement("section", {className: "purple"}, 
+
+                    React.createElement("h1", null, "Home Features"), 
+
+
+                        React.createElement("h2", null, "Main Features"), 
+                        React.createElement("div", {className: "table-responsive"}, 
+                            React.createElement("table", {className: "table table-bordered"}, 
+                                React.createElement("tbody", null, 
+                                    React.createElement("tr", null, 
+                                        React.createElement("th", null, "Service Type"), 
+                                        React.createElement("td", {tabindex: "1"}, 
+                                            React.createElement("select", {className: "form-control", value: this.state.provider.service_type}, 
+                                                React.createElement("option", {value: "CARE_HOME"}, "Care Home"), 
+                                                React.createElement("option", {value: "NURSING_HOME"}, "Nursing Home"), 
+                                                React.createElement("option", {value: "HOME_CARE"}, "Home Care")
+                                            )
+                                        )
+                                    ), 
+
+                                    React.createElement("tr", null, 
+                                        React.createElement("th", null, "Total Beds"), 
+                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "total_beds", onChange: this.updateField, value: this.state.provider.total_beds, type: "number"}))
+                                    ), 
+                                    React.createElement("tr", null, 
+                                        React.createElement("th", null, "Under 65"), 
+                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_under_65", onChange: this.updateCheckbox, checked: this.state.provider.service_under_65, type: "checkbox"}))
+                                    ), 
+                                    React.createElement("tr", null, 
+                                        React.createElement("th", null, "Over 65"), 
+                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_over_65", onChange: this.updateCheckbox, checked: this.state.provider.service_over_65, type: "checkbox"}))
+                                    ), 
+                                    React.createElement("tr", null, 
+                                        React.createElement("th", null, "Dementia"), 
+                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_dementia", onChange: this.updateCheckbox, checked: this.state.provider.service_dementia, type: "checkbox"}))
+                                    ), 
+
+                                    React.createElement("tr", null, 
+                                        React.createElement("th", null, "Learning Disability"), 
+                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_learning_disability", onChange: this.updateCheckbox, checked: this.state.provider.service_learning_disability, type: "checkbox"}))
+                                    ), 
+                                    React.createElement("tr", null, 
+                                        React.createElement("th", null, "Physical Disability"), 
+                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_physical_disability", onChange: this.updateCheckbox, checked: this.state.provider.service_physical_disability, type: "checkbox"}))
+                                    ), 
+                                    React.createElement("tr", null, 
+                                        React.createElement("th", null, "Sensory Impairment"), 
+                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_sensory_impairment", onChange: this.updateCheckbox, checked: this.state.provider.service_sensory_impairment, type: "checkbox"}))
+                                    ), 
+                                    React.createElement("tr", null, 
+                                        React.createElement("th", null, "Mental Health"), 
+                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_mental_health", onChange: this.updateCheckbox, checked: this.state.provider.service_mental_health, type: "checkbox"}))
+                                    ), 
+                                    React.createElement("tr", null, 
+                                        React.createElement("th", null, "Substance Misuse"), 
+                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_substance_misuse", onChange: this.updateCheckbox, checked: this.state.provider.service_substance_misuse, type: "checkbox"}))
+                                    ), 
+                                    React.createElement("tr", null, 
+                                        React.createElement("th", null, "Eating Disorders"), 
+                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_eating_disorders", onChange: this.updateCheckbox, checked: this.state.provider.service_eating_disorders, type: "checkbox"}))
+                                    )
+                                )
+                            )
+                        ), 
+                React.createElement("div", {className: "text-center"}, 
+                    React.createElement("button", {className: "btn btn-lg btn-warning", onClick: this.saveProvider}, "Save Provider")
+                )
+
+                )
+            )
+        );
+    }
+});
+
+module.exports = LoginForm;
+
+},{"react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/Example.jsx":[function(require,module,exports){
 var React = require('react');
 var Navigation = require('react-router').Navigation;
 var Fluxxor = require('fluxxor');
@@ -107,104 +269,162 @@ var SubmitEmailBox = React.createClass({displayName: "SubmitEmailBox",
 
 module.exports = SubmitEmailBox;
 
-},{"fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/config.js":[function(require,module,exports){
+},{"fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/LoginForm.jsx":[function(require,module,exports){
+var React = require('react');
+var Navigation = require('react-router').Navigation;
+var Fluxxor = require('fluxxor');
+var FluxMixin = Fluxxor.FluxMixin(React);
+
+var LoginForm = React.createClass({displayName: "LoginForm",
+    mixins: [FluxMixin, Navigation],
+    propTypes: {
+       onSubmit: React.PropTypes.func
+    },
+    submit: function () {
+        var email = React.findDOMNode(this.refs.email).value;
+        var password = React.findDOMNode(this.refs.password).value;
+
+        this.props.onSubmit({
+            email:email,
+            password:password
+        });
+    },
+    render: function(){
+        return (
+            React.createElement("div", {className: "row"}, 
+                React.createElement("br", null), React.createElement("br", null), React.createElement("br", null), 
+                React.createElement("div", {className: "col-xs-4 col-xs-offset-4"}, 
+                    React.createElement("div", {className: "panel panel-default"}, 
+                        React.createElement("div", {className: "panel-heading"}, 
+                            React.createElement("h3", {className: "panel-title"}, "Please Sign In")
+                        ), 
+                        React.createElement("div", {className: "panel-body"}, 
+                            React.createElement("div", {className: "form-group"}, 
+                                React.createElement("input", {ref: "email", className: "form-control", placeholder: "E-mail", name: "email", type: "email", autofocus: ""})
+                            ), 
+                            React.createElement("div", {className: "form-group"}, 
+                                React.createElement("input", {ref: "password", className: "form-control", placeholder: "Password", name: "password", type: "password"})
+                            ), 
+
+                            React.createElement("button", {onClick: this.submit, className: "btn btn-lg btn-success btn-block"}, "Login")
+                        )
+                    )
+                )
+            )
+        );
+    }
+});
+
+module.exports = LoginForm;
+
+},{"fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/ProviderTable.jsx":[function(require,module,exports){
+var React = require('react');
+
+var LoginForm = React.createClass({displayName: "LoginForm",
+    propTypes: {
+        providers: React.PropTypes.array,
+        onSelectProvider: React.PropTypes.func
+    },
+    submit: function () {
+        var email = React.findDOMNode(this.refs.email).value;
+        var password = React.findDOMNode(this.refs.password).value;
+
+        this.props.onSubmit({
+            email:email,
+            password:password
+        });
+    },
+    selectProvider: function (event) {
+        this.props.onSelectProvider(event.target.dataset.id);
+    },
+    render: function(){
+        return (
+            React.createElement("div", null, 
+            React.createElement("table", {className: "table table-striped"}, 
+                React.createElement("thead", null, 
+                React.createElement("tr", null, 
+                    React.createElement("th", null, "Name"), 
+                    React.createElement("th", null, "CQC Id")
+                )
+                    ), 
+                React.createElement("tbody", null, 
+                    this.props.providers.map(function (provider) {
+                        return (
+                            React.createElement("tr", null, 
+                                React.createElement("td", null, React.createElement("span", {className: "link", onClick: this.selectProvider, "data-id": provider.id}, provider.name)), 
+                                React.createElement("td", null, provider.cqc_id)
+                            )
+                        )
+                    }.bind(this))
+                )
+            )
+            )
+        );
+    }
+});
+
+module.exports = LoginForm;
+
+},{"react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/config.js":[function(require,module,exports){
 module.exports = {
-    API_URL: 'http://careselector-core.herokuapp.com/api/'
+    API_URL: 'http://careselector-core.app:8000/api/'
 };
 
 },{}],"/Users/user/PhpstormProjects/careselector-admin/js/src/constants.js":[function(require,module,exports){
 module.exports = {
-    LOAD_HOMES: "LOAD_HOMES"
+    ATTEMPT_AUTH: "ATTEMPT_AUTH",
+    ATTEMPT_AUTH_SUCCESS:"ATTEMPT_AUTH_SUCCESS",
+    LOAD_BRISTOL_PROVIDERS:"LOAD_BRISTOL_PROVIDERS",
+    LOAD_BRISTOL_PROVIDERS_SUCCESS:"LOAD_BRISTOL_PROVIDERS_SUCCESS",
+    LOAD_PROVIDER_FOR_EDITING:"LOAD_PROVIDER_FOR_EDITING",
+    LOAD_PROVIDER_FOR_EDITING_SUCCESS:"LOAD_PROVIDER_FOR_EDITING_SUCCESS",
+    SAVE_PROVIDER:"SAVE_PROVIDER",
+    SAVE_PROVIDER_SUCCESS:"SAVE_PROVIDER_SUCCESS"
 };
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/js/src/models/CareseekerService.js":[function(require,module,exports){
-var $ = require('jquery-browserify');
-var config = require('./../config.js');
+},{}],"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/EditProvider.jsx":[function(require,module,exports){
+var React = require('react');
+var Fluxxor = require('fluxxor');
+var FluxMixin = Fluxxor.FluxMixin(React);
+var ProviderTable = require('./../components/ProviderTable.jsx');
+var StoreWatchMixin = Fluxxor.StoreWatchMixin;
+var Navigation = require('react-router').Navigation;
+var EditProviderForm = require('./../components/EditProviderForm.jsx');
 
-module.exports = {
-   updateEmail: function (id, email, success) {
-       $.ajax
-       ({
-           type: "PUT",
-           //the url where you want to sent the userName and password to
-           url: config.API_URL + 'careseekers/' + id,
-           dataType: 'json',
-           //json object to sent to the authentication url
-           data: {
-               email: email
-           },
-           success: function (response) {
-               success();
-           }
-       });
-   }
-};
-
-},{"./../config.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/config.js","jquery-browserify":"/Users/user/PhpstormProjects/careselector-admin/node_modules/jquery-browserify/lib/jquery.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/models/GoogleGeocodeApiService.js":[function(require,module,exports){
-var $ = require('jquery-browserify');
-
-module.exports = {
-    getCoords: function (address, success) {
-        var request;
-        request = $.ajax({
-            url: 'https://maps.googleapis.com/maps/api/geocode/json?components=country:uk&address=' + address,
-            success: function (response) {
-                success(response.results[0].geometry.location.lng, response.results[0].geometry.location.lat);
-            }.bind(this)
-        });
-
-    }
-};
-
-},{"jquery-browserify":"/Users/user/PhpstormProjects/careselector-admin/node_modules/jquery-browserify/lib/jquery.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/models/HomesModel.js":[function(require,module,exports){
-var $ = require('jquery-browserify');
-var config = require('./../config.js');
-var GeocodeService = require('./GoogleGeocodeApiService.js');
-
-module.exports = {
-    get: function (filters, success, error) {
-
-        GeocodeService.getCoords(filters.address, function (long, lat) {
-            filters.long = long;
-            filters.lat = lat;
-            $.ajax({
-                url: config.API_URL + 'homes',
-                data: filters,
-                success: function (response) {
-                    success(response);
-                },
-                error: function (response) {
-                    error(JSON.parse(response.responseText).errors.validation);
-                }
-            });
-        });
+var EditProvider = React.createClass({displayName: "EditProvider",
+    mixins: [FluxMixin, StoreWatchMixin('EditProviderStore'), Navigation],
+    contextTypes: {
+        router: React.PropTypes.func
     },
-    postShortlist: function (shortlist, filters, success) {
-        $.ajax
-        ({
-            type: "POST",
-            //the url where you want to sent the userName and password to
-            url: config.API_URL + 'careseekers/shortlist',
-            dataType: 'json',
-            //json object to sent to the authentication url
-            data: {
-                meta:{
-                    search_location:filters.address,
-                    search_care_type:filters.care_type,
-                    search_filter_dementia:filters.hasOwnProperty('dementia'),
-                    search_filter_learning_disability:filters.hasOwnProperty('learning_disability'),
-                    search_filter_under_65:filters.hasOwnProperty('under_65'),
-                    search_filter_sensory_impairments:filters.hasOwnProperty('sensory_impairments')
-                },
-                providers:shortlist},
-            success: function (response) {
-                success(response.id);
-            }
-        });
+    getStateFromFlux: function () {
+        return {
+            provider: this.getFlux().store('EditProviderStore').getProvider()
+        }
+    },
+    componentDidMount: function () {
+        this.getFlux().actions.loadProviderForEditing(this.context.router.getCurrentParams().id);
+    },
+    saveProvider: function (provider) {
+        this.getFlux().actions.saveProvider(this.context.router.getCurrentParams().id, provider);
+    },
+    render: function() {
+        return (
+            React.createElement("div", {className: "container"}, 
+                React.createElement("div", null, 
+                    React.createElement("div", {className: "row"}, 
+                        React.createElement("div", {className: "col-xs-6 col-xs-offset-3"}, 
+                            React.createElement(EditProviderForm, {provider: this.state.provider, onSaveProvider: this.saveProvider})
+                        )
+                    )
+                )
+            )
+        );
     }
-};
+});
 
-},{"./../config.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/config.js","./GoogleGeocodeApiService.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/models/GoogleGeocodeApiService.js","jquery-browserify":"/Users/user/PhpstormProjects/careselector-admin/node_modules/jquery-browserify/lib/jquery.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/Example.jsx":[function(require,module,exports){
+module.exports = EditProvider;
+
+},{"./../components/EditProviderForm.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/EditProviderForm.jsx","./../components/ProviderTable.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/ProviderTable.jsx","fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/Example.jsx":[function(require,module,exports){
 var React = require('react');
 var Fluxxor = require('fluxxor');
 var FluxMixin = Fluxxor.FluxMixin(React);
@@ -229,141 +449,201 @@ var Home = React.createClass({displayName: "Home",
 
 module.exports = Home;
 
-},{"./../components/Example.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/Example.jsx","fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/routes.jsx":[function(require,module,exports){
+},{"./../components/Example.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/Example.jsx","fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/Index.jsx":[function(require,module,exports){
+var React = require('react');
+var Fluxxor = require('fluxxor');
+var FluxMixin = Fluxxor.FluxMixin(React);
+var ProviderTable = require('./../components/ProviderTable.jsx');
+var StoreWatchMixin = Fluxxor.StoreWatchMixin;
+var Navigation = require('react-router').Navigation;
+
+var Index = React.createClass({displayName: "Index",
+    mixins: [FluxMixin, StoreWatchMixin('BristolProvidersStore'), Navigation],
+    getStateFromFlux: function () {
+        return {
+            providers: this.getFlux().store('BristolProvidersStore').getProviders()
+        }
+    },
+    componentDidMount: function () {
+        this.getFlux().actions.loadBristolProviders();
+    },
+    redirect: function (id) {
+        this.getFlux().actions.loadProviderForEditing(id);
+        this.transitionTo('EditProvider', {id:id});
+    },
+    render: function() {
+        return (
+            React.createElement("div", {className: "container"}, 
+                React.createElement("div", null, 
+                    React.createElement("div", {className: "row"}, 
+                        React.createElement("div", {className: "col-xs-12"}, 
+                            React.createElement(ProviderTable, {onSelectProvider: this.redirect, providers: this.state.providers})
+                        )
+                    )
+                )
+            )
+        );
+    }
+});
+
+module.exports = Index;
+
+},{"./../components/ProviderTable.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/ProviderTable.jsx","fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/Login.jsx":[function(require,module,exports){
+var React = require('react');
+var Fluxxor = require('fluxxor');
+var FluxMixin = Fluxxor.FluxMixin(React);
+var LoginForm = require('./../components/LoginForm.jsx');
+var Navigation = require('react-router').Navigation;
+
+var Login = React.createClass({displayName: "Login",
+    mixins: [FluxMixin, Navigation],
+    attemptLogin: function (credentials) {
+        this.getFlux().actions.attemptAuth(credentials)
+            .then(function () {
+                this.transitionTo('Index');
+            }.bind(this));
+    },
+    render: function() {
+        return (
+            React.createElement("div", {className: "container"}, 
+                React.createElement("div", null, 
+                    React.createElement("div", {className: "row"}, 
+                        React.createElement("div", {className: "col-xs-12"}, 
+                            React.createElement(LoginForm, {onSubmit: this.attemptLogin})
+                        )
+                    )
+                )
+            )
+        );
+    }
+});
+
+module.exports = Login;
+
+},{"./../components/LoginForm.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/LoginForm.jsx","fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/routes.jsx":[function(require,module,exports){
 var App = require('./App.jsx');
 var React = require('react');
 var Router = require('react-router');
 var Route = Router.Route;
 var DefaultRoute = Router.DefaultRoute;
 var Example = require('./pages/Example.jsx');
+var Login = require('./pages/Login.jsx');
+var Index = require('./pages/Index.jsx');
+var EditProvider = require('./pages/EditProvider.jsx');
 
 
 var routes = (
     React.createElement(Route, {handler: App, path: "/"}, 
-        React.createElement(Route, {name: "example", path: "/example", handler: Example})
+        React.createElement(Route, {name: "Login", path: "/login", handler: Login}), 
+        React.createElement(Route, {name: "Index", path: "/index", handler: Index}), 
+        React.createElement(Route, {name: "EditProvider", path: "/providers/:id", handler: EditProvider})
     )
 );
 
 module.exports = routes;
 
-},{"./App.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/App.jsx","./pages/Example.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/Example.jsx","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/HomesStore.js":[function(require,module,exports){
+},{"./App.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/App.jsx","./pages/EditProvider.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/EditProvider.jsx","./pages/Example.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/Example.jsx","./pages/Index.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/Index.jsx","./pages/Login.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/Login.jsx","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/AttemptAuth.js":[function(require,module,exports){
+var qwest = require('qwest');
+var config = require('./../../config.js');
+
+module.exports = function (credentials) {
+    return qwest.post(config.API_URL + 'auth', credentials);
+};
+
+},{"./../../config.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/config.js","qwest":"/Users/user/PhpstormProjects/careselector-admin/node_modules/qwest/src/qwest.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/GetHeaders.js":[function(require,module,exports){
+module.exports = function () {
+    return {
+        Authorization: 'Bearer ' + localStorage.getItem('token')
+    }
+};
+
+},{}],"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/SetToken.js":[function(require,module,exports){
+module.exports = function (token) {
+    localStorage.setItem('token', token);
+};
+
+},{}],"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/GetBristolProviders.js":[function(require,module,exports){
+var qwest = require('qwest');
+var config = require('./../../config.js');
+var GetHeaders = require('./../auth/GetHeaders.js');
+
+module.exports = function () {
+    return qwest.get(config.API_URL + 'providers/bristol', {},{headers:GetHeaders()});
+};
+
+},{"./../../config.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/config.js","./../auth/GetHeaders.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/GetHeaders.js","qwest":"/Users/user/PhpstormProjects/careselector-admin/node_modules/qwest/src/qwest.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/GetProvider.js":[function(require,module,exports){
+var qwest = require('qwest');
+var config = require('./../../config.js');
+var GetHeaders = require('./../auth/GetHeaders.js');
+
+module.exports = function (id) {
+    return qwest.get(config.API_URL + 'providers/' + id, {},{headers:GetHeaders()});
+};
+
+},{"./../../config.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/config.js","./../auth/GetHeaders.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/GetHeaders.js","qwest":"/Users/user/PhpstormProjects/careselector-admin/node_modules/qwest/src/qwest.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/SaveProvider.js":[function(require,module,exports){
+var qwest = require('qwest');
+var config = require('./../../config.js');
+var GetHeaders = require('./../auth/GetHeaders.js');
+
+module.exports = function (id, provider) {
+    console.log(provider);
+    return qwest.post(config.API_URL + 'providers/' + id, provider, GetHeaders());
+};
+
+},{"./../../config.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/config.js","./../auth/GetHeaders.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/GetHeaders.js","qwest":"/Users/user/PhpstormProjects/careselector-admin/node_modules/qwest/src/qwest.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/BristolProvidersStore.js":[function(require,module,exports){
 var Fluxxor = require('Fluxxor');
 var constants = require('./../constants.js');
 
 module.exports = Fluxxor.createStore({
     initialize: function () {
-        this.homes = [];
-        this.shortlist = [];
-        this.errors = [];
-        this.count = 0;
+        this.providers = [];
         this.loading = false;
-        this.isSendingShortlistToServer = false;
 
         this.bindActions(
-            "LOAD_HOMES", this.loadHomes,
-            "LOAD_HOMES_SUCCESS", this.loadHomesSuccess,
-            "LOAD_HOMES_ERROR", this.loadHomesError,
-            "ADD_TO_SHORTLIST", this.addToShortlist,
-            "REMOVE_FROM_SHORTLIST", this.removeFromShortlist,
-            "POST_SHORTLIST_TO_SERVER", this.onPostShortlistToServer,
-            "POST_SHORTLIST_TO_SERVER_SUCCESS", this.onPostShortlistToServerSuccess
+            "LOAD_BRISTOL_PROVIDERS", this.isLoading,
+            "LOAD_BRISTOL_PROVIDERS_SUCCESS", this.loadProviders
         );
     },
-    onPostShortlistToServer: function () {
-        this.isSendingShortlistToServer = true;
-        this.emit("change");
-    },
-    onPostShortlistToServerSuccess: function (id) {
-        this.isSendingShortlistToServer = false;
-        this.emit("change");
-    },
-    loadHomes: function () {
+    isLoading: function () {
         this.loading = true;
         this.emit("change");
     },
-    loadHomesSuccess: function (homesData) {
+    loadProviders: function (response) {
         this.loading = false;
-        $.each(homesData.data, function (index, value) {
-            var homeInShortlist = this.shortlist.filter(function (home) {
-                return home.id === value.id;
-            });
-
-            if (homeInShortlist.length !== 0) {
-                value.inShortlist = true;
-            } else {
-                value.inShortlist = false;
-            }
-            value.key = index;
-            homesData.data[index] = value;
-        }.bind(this));
-
-        this.homes = homesData.data;
-
-        this.count = homesData.meta.count;
-        this.errors = [];
+        this.providers = response.data;
         this.emit("change");
     },
-    loadHomesError: function (errors) {
-        this.errors = errors;
+    getProviders: function () {
+        return this.providers;
+    }
+});
+
+},{"./../constants.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/constants.js","Fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/EditProviderStore.js":[function(require,module,exports){
+var Fluxxor = require('Fluxxor');
+var constants = require('./../constants.js');
+
+module.exports = Fluxxor.createStore({
+    initialize: function () {
+        this.provider = {};
         this.loading = false;
+
+        this.bindActions(
+            "LOAD_PROVIDER_FOR_EDITING", this.loadProvider,
+            "LOAD_PROVIDER_FOR_EDITING_SUCCESS", this.loadProviderSuccess
+        );
+    },
+    loadProvider: function () {
+        this.loading = true;
+        this.provider = {};
         this.emit("change");
     },
-    getHomes: function () {
-        return this.homes;
-    },
-    getErrors: function () {
-        return this.errors;
-    },
-    getShortlist: function () {
-        return this.shortlist;
-    },
-    hasLoadedHomes: function ()
-    {
-        if (this.homes.length > 0) {
-            return true;
-        }
-
-        return false;
-    },
-    addToShortlist: function (id) {
-        var home = this.homes.filter(function (home) {
-            return home.id === id;
-        })[0];
-
-        this.shortlist.push(home);
-
-        this.homes = this.homes.filter(function (home) {
-            if (home.id === id) {
-                home.inShortlist = true;
-            }
-            return home;
-        });
-
+    loadProviderSuccess: function (response) {
+        this.loading = false;
+        this.provider = response.data;
         this.emit("change");
     },
-    removeFromShortlist: function (id) {
-        id = parseInt(id);
-        this.shortlist = this.shortlist.filter(function (home) {
-            return home.id !== id;
-        });
-
-        this.homes = this.homes.filter(function (home) {
-            if (home.id === id) {
-                home.inShortlist = false;
-            }
-
-            return home;
-        });
-        this.emit("change");
-    },
-    isLoading: function () {
-        return this.loading;
-    },
-    getCount: function () {
-        return this.count;
-    },
-    getIsSendingShortlistToServer: function () {
-        return this.isSendingShortlistToServer;
+    getProvider: function () {
+        return this.provider;
     }
 });
 
@@ -14135,6 +14415,524 @@ if ( typeof define === "function" && define.amd && define.amd.jQuery ) {
 return jQuery;
 
 })( window ); }));
+
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/qwest/src/qwest.js":[function(require,module,exports){
+/*! qwest 1.7.0 (https://github.com/pyrsmk/qwest) */
+
+;(function(context,name,definition){
+	if(typeof module!='undefined' && module.exports){
+		module.exports=definition;
+	}
+	else if(typeof define=='function' && define.amd){
+		define(definition);
+	}
+	else{
+		context[name]=definition;
+	}
+}(this,'qwest',function(){
+
+	var win=window,
+		doc=document,
+		before,
+		// Default response type for XDR in auto mode
+		defaultXdrResponseType='json',
+		// Variables for limit mechanism
+		limit=null,
+		requests=0,
+		request_stack=[],
+		// Get XMLHttpRequest object
+		getXHR=function(){
+				return win.XMLHttpRequest?
+						new XMLHttpRequest():
+						new ActiveXObject('Microsoft.XMLHTTP');
+			},
+		// Guess XHR version
+		xhr2=(getXHR().responseType===''),
+
+	// Core function
+	qwest=function(method,url,data,options,before){
+
+		// Format
+		method=method.toUpperCase();
+		data=data || null;
+		options=options || {};
+
+		// Define variables
+		var nativeResponseParsing=false,
+			crossOrigin,
+			xhr,
+			xdr=false,
+			timeoutInterval,
+			aborted=false,
+			attempts=0,
+			headers={},
+			mimeTypes={
+				text: '*/*',
+				xml: 'text/xml',
+				json: 'application/json',
+				post: 'application/x-www-form-urlencoded'
+			},
+			accept={
+				text: '*/*',
+				xml: 'application/xml; q=1.0, text/xml; q=0.8, */*; q=0.1',
+				json: 'application/json; q=1.0, text/*; q=0.8, */*; q=0.1'
+			},
+			contentType='Content-Type',
+			vars='',
+			i,j,
+			serialized,
+			then_stack=[],
+			catch_stack=[],
+			complete_stack=[],
+			response,
+			success,
+			error,
+			func,
+
+		// Define promises
+		promises={
+			then:function(func){
+				if(options.async){
+					then_stack.push(func);
+				}
+				else if(success){
+					func.call(xhr,response);
+				}
+				return promises;
+			},
+			'catch':function(func){
+				if(options.async){
+					catch_stack.push(func);
+				}
+				else if(error){
+					func.call(xhr,response);
+				}
+				return promises;
+			},
+			complete:function(func){
+				if(options.async){
+					complete_stack.push(func);
+				}
+				else{
+					func.call(xhr);
+				}
+				return promises;
+			}
+		},
+		promises_limit={
+			then:function(func){
+				request_stack[request_stack.length-1].then.push(func);
+				return promises_limit;
+			},
+			'catch':function(func){
+				request_stack[request_stack.length-1]['catch'].push(func);
+				return promises_limit;
+			},
+			complete:function(func){
+				request_stack[request_stack.length-1].complete.push(func);
+				return promises_limit;
+			}
+		},
+
+		// Handle the response
+		handleResponse=function(){
+			// Verify request's state
+			// --- https://stackoverflow.com/questions/7287706/ie-9-javascript-error-c00c023f
+			if(aborted){
+				return;
+			}
+			// Prepare
+			var i,req,p,responseType;
+			--requests;
+			// Clear the timeout
+			clearInterval(timeoutInterval);
+			// Launch next stacked request
+			if(request_stack.length){
+				req=request_stack.shift();
+				p=qwest(req.method,req.url,req.data,req.options,req.before);
+				for(i=0;func=req.then[i];++i){
+					p.then(func);
+				}
+				for(i=0;func=req['catch'][i];++i){
+					p['catch'](func);
+				}
+				for(i=0;func=req.complete[i];++i){
+					p.complete(func);
+				}
+			}
+			// Handle response
+			try{
+				// Init
+				var responseText='responseText',
+					responseXML='responseXML',
+					parseError='parseError';
+				// Process response
+				if(nativeResponseParsing && 'response' in xhr && xhr.response!==null){
+					response=xhr.response;
+				}
+				else if(options.responseType=='document'){
+					var frame=doc.createElement('iframe');
+					frame.style.display='none';
+					doc.body.appendChild(frame);
+					frame.contentDocument.open();
+					frame.contentDocument.write(xhr.response);
+					frame.contentDocument.close();
+					response=frame.contentDocument;
+					doc.body.removeChild(frame);
+				}
+				else{
+					// Guess response type
+					responseType=options.responseType;
+					if(responseType=='auto'){
+						if(xdr){
+							responseType=defaultXdrResponseType;
+						}
+						else{
+							var ct=xhr.getResponseHeader(contentType) || '';
+							if(ct.indexOf(mimeTypes.json)>-1){
+								responseType='json';
+							}
+							else if(ct.indexOf(mimeTypes.xml)>-1){
+								responseType='xml';
+							}
+							else{
+								responseType='text';
+							}
+						}
+					}
+					// Handle response type
+					switch(responseType){
+						case 'json':
+							try{
+								if('JSON' in win){
+									response=JSON.parse(xhr[responseText]);
+								}
+								else{
+									response=eval('('+xhr[responseText]+')');
+								}
+							}
+							catch(e){
+								throw "Error while parsing JSON body : "+e;
+							}
+							break;
+						case 'xml':
+							// Based on jQuery's parseXML() function
+							try{
+								// Standard
+								if(win.DOMParser){
+									response=(new DOMParser()).parseFromString(xhr[responseText],'text/xml');
+								}
+								// IE<9
+								else{
+									response=new ActiveXObject('Microsoft.XMLDOM');
+									response.async='false';
+									response.loadXML(xhr[responseText]);
+								}
+							}
+							catch(e){
+								response=undefined;
+							}
+							if(!response || !response.documentElement || response.getElementsByTagName('parsererror').length){
+								throw 'Invalid XML';
+							}
+							break;
+						default:
+							response=xhr[responseText];
+					}
+				}
+				// Late status code verification to allow data when, per example, a 409 is returned
+				// --- https://stackoverflow.com/questions/10046972/msie-returns-status-code-of-1223-for-ajax-request
+				if('status' in xhr && !/^2|1223/.test(xhr.status)){
+					throw xhr.status+' ('+xhr.statusText+')';
+				}
+				// Execute 'then' stack
+				success=true;
+				p=response;
+				if(options.async){
+					for(i=0;func=then_stack[i];++i){
+						p=func.call(xhr, p);
+					}
+				}
+			}
+			catch(e){
+				error=true;
+				// Execute 'catch' stack
+				if(options.async){
+					for(i=0;func=catch_stack[i];++i){
+						func.call(xhr, e, response);
+					}
+				}
+			}
+			// Execute complete stack
+			if(options.async){
+				for(i=0;func=complete_stack[i];++i){
+					func.call(xhr, response);
+				}
+			}
+		},
+
+		// Handle errors
+		handleError= function(e){
+			error=true;
+			--requests;
+			// Clear the timeout
+			clearInterval(timeoutInterval);
+			// Execute 'catch' stack
+			if(options.async){
+				for(i=0;func=catch_stack[i];++i){
+					func.call(xhr, e, null);
+				}
+			}
+		},
+
+		// Recursively build the query string
+		buildData=function(data,key){
+			var res=[],
+				enc=encodeURIComponent,
+				p;
+			if(typeof data==='object' && data!=null) {
+				for(p in data) {
+					if(data.hasOwnProperty(p)) {
+						var built=buildData(data[p],key?key+'['+p+']':p);
+						if(built!==''){
+							res=res.concat(built);
+						}
+					}
+				}
+			}
+			else if(data!=null && key!=null){
+				res.push(enc(key)+'='+enc(data));
+			}
+			return res.join('&');
+		};
+
+		// New request
+		++requests;
+
+		if ('retries' in options) {
+			if (win.console && console.warn) {
+				console.warn('[Qwest] The retries option is deprecated. It indicates total number of requests to attempt. Please use the "attempts" option.');
+			}
+			options.attempts = options.retries;
+		}
+
+		// Normalize options
+		options.async='async' in options?!!options.async:true;
+		options.cache='cache' in options?!!options.cache:(method!='GET');
+		options.dataType='dataType' in options?options.dataType.toLowerCase():'post';
+		options.responseType='responseType' in options?options.responseType.toLowerCase():'auto';
+		options.user=options.user || '';
+		options.password=options.password || '';
+		options.withCredentials=!!options.withCredentials;
+		options.timeout='timeout' in options?parseInt(options.timeout,10):30000;
+		options.attempts='attempts' in options?parseInt(options.attempts,10):1;
+
+		// Guess if we're dealing with a cross-origin request
+		i=url.match(/\/\/(.+?)\//);
+		crossOrigin=i && i[1]?i[1]!=location.host:false;
+
+		// Prepare data
+		if('ArrayBuffer' in win && data instanceof ArrayBuffer){
+			options.dataType='arraybuffer';
+		}
+		else if('Blob' in win && data instanceof Blob){
+			options.dataType='blob';
+		}
+		else if('Document' in win && data instanceof Document){
+			options.dataType='document';
+		}
+		else if('FormData' in win && data instanceof FormData){
+			options.dataType='formdata';
+		}
+		switch(options.dataType){
+			case 'json':
+				data=JSON.stringify(data);
+				break;
+			case 'post':
+				data=buildData(data);
+		}
+
+		// Prepare headers
+		if(options.headers){
+			var format=function(match,p1,p2){
+				return p1+p2.toUpperCase();
+			};
+			for(i in options.headers){
+				headers[i.replace(/(^|-)([^-])/g,format)]=options.headers[i];
+			}
+		}
+		if(!headers[contentType] && method!='GET'){
+			if(options.dataType in mimeTypes){
+				if(mimeTypes[options.dataType]){
+					headers[contentType]=mimeTypes[options.dataType];
+				}
+			}
+		}
+		if(!headers.Accept){
+			headers.Accept=(options.responseType in accept)?accept[options.responseType]:'*/*';
+		}
+		if(!crossOrigin && !headers['X-Requested-With']){ // because that header breaks in legacy browsers with CORS
+			headers['X-Requested-With']='XMLHttpRequest';
+		}
+
+		// Prepare URL
+		if(method=='GET' && data){
+			vars+=data;
+		}
+		if(!options.cache){
+			if(vars){
+				vars+='&';
+			}
+			vars+='__t='+(+new Date());
+		}
+		if(vars){
+			url+=(/\?/.test(url)?'&':'?')+vars;
+		}
+
+		// The limit has been reached, stock the request
+		if(limit && requests==limit){
+			request_stack.push({
+				method	: method,
+				url		: url,
+				data	: data,
+				options	: options,
+				before	: before,
+				then	: [],
+				'catch'	: [],
+				complete: []
+			});
+			return promises_limit;
+		}
+
+		// Send the request
+		var send=function(){
+			// Get XHR object
+			xhr=getXHR();
+			if(crossOrigin){
+				if(!('withCredentials' in xhr) && win.XDomainRequest){
+					xhr=new XDomainRequest(); // CORS with IE8/9
+					xdr=true;
+					if(method!='GET' && method!='POST'){
+						method='POST';
+					}
+				}
+			}
+			// Open connection
+			if(xdr){
+				xhr.open(method,url);
+			}
+			else{
+				xhr.open(method,url,options.async,options.user,options.password);
+				if(xhr2 && options.async){
+					xhr.withCredentials=options.withCredentials;
+				}
+			}
+			// Set headers
+			if(!xdr){
+				for(var i in headers){
+					xhr.setRequestHeader(i,headers[i]);
+				}
+			}
+			// Verify if the response type is supported by the current browser
+			if(xhr2 && options.responseType!='document' && options.responseType!='auto'){ // Don't verify for 'document' since we're using an internal routine
+				try{
+					xhr.responseType=options.responseType;
+					nativeResponseParsing=(xhr.responseType==options.responseType);
+				}
+				catch(e){}
+			}
+			// Plug response handler
+			if(xhr2 || xdr){
+				xhr.onload=handleResponse;
+				xhr.onerror=handleError;
+			}
+			else{
+				xhr.onreadystatechange=function(){
+					if(xhr.readyState==4){
+						handleResponse();
+					}
+				};
+			}
+			// Override mime type to ensure the response is well parsed
+			if(options.responseType!='auto' && 'overrideMimeType' in xhr){
+				xhr.overrideMimeType(mimeTypes[options.responseType]);
+			}
+			// Run 'before' callback
+			if(before){
+				before.call(xhr);
+			}
+			// Send request
+			if(xdr){
+				setTimeout(function(){ // https://developer.mozilla.org/en-US/docs/Web/API/XDomainRequest
+					xhr.send(method!='GET'?data:null);
+				},0);
+			}
+			else{
+				xhr.send(method!='GET'?data:null);
+			}
+		};
+
+		// Timeout/attempts
+		var timeout=function(){
+			timeoutInterval=setTimeout(function(){
+				aborted=true;
+				xhr.abort();
+				if(!options.attempts || ++attempts!=options.attempts){
+					aborted=false;
+					timeout();
+					send();
+				}
+				else{
+					aborted=false;
+					error=true;
+					response='Timeout ('+url+')';
+					if(options.async){
+						for(i=0;func=catch_stack[i];++i){
+							func.call(xhr,response);
+						}
+					}
+				}
+			},options.timeout);
+		};
+
+		// Start the request
+		timeout();
+		send();
+
+		// Return promises
+		return promises;
+
+	};
+
+	// Return external qwest object
+	var create=function(method){
+			return function(url,data,options){
+				var b=before;
+				before=null;
+				return qwest(method,this.base+url,data,options,b);
+			};
+		},
+		obj={
+            base: '',
+			before: function(callback){
+				before=callback;
+				return obj;
+			},
+			get: create('GET'),
+			post: create('POST'),
+			put: create('PUT'),
+			'delete': create('DELETE'),
+			xhr2: xhr2,
+			limit: function(by){
+				limit=by;
+			},
+			setDefaultXdrResponseType: function(type){
+				defaultXdrResponseType=type.toLowerCase();
+			}
+		};
+	return obj;
+
+}()));
 
 },{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Cancellation.js":[function(require,module,exports){
 "use strict";

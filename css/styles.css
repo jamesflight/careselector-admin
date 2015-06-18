@@ -876,3 +876,48 @@ a:hover {
     background-position: center;
     background-size: cover;
 }
+
+.link {
+    cursor:pointer;
+    color:#e81690;
+}
+
+body {
+    font-family: 'Open Sans',sans-serif;
+}
+section {
+    margin: 20px 0;
+    padding: 0 0 20px 0;
+    border-bottom: 1px solid #D2D2D2;
+}
+section:last-child {
+    border-bottom: 0;
+}
+.green {
+    color: #4B934B;
+}
+.orange {
+    color:#BF5D36;
+}
+.purple {
+    color: #7D66C3;
+}
+table tr th,table tr td {
+    text-align: center;
+}
+table tr:nth-child(odd){
+    background: #EBEBEB;
+}
+table tr:nth-child(even){
+    background: white;
+}
+table tr th,table tr td {
+    width:50%;
+}
+table.grey tr:nth-child(even){
+    background: #EBEBEB;
+}
+input[type="file"]{
+    max-width: 232px;
+    margin-top: 20px;
+}

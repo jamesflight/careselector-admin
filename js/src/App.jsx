@@ -6,7 +6,6 @@ var RouteHandler = Router.RouteHandler;
 var Fluxxor = require('fluxxor');
 var FluxMixin = Fluxxor.FluxMixin(React);
 
-
 var App = React.createClass({
     mixins:[FluxMixin],
     render: function(){
