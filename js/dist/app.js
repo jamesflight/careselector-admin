@@ -134,7 +134,7 @@ var LoginForm = React.createClass({displayName: "LoginForm",
                     React.createElement("div", null, 
                         React.createElement("br", null), React.createElement("br", null), React.createElement("br", null), 
                         React.createElement("div", {className: "text-center"}, 
-                            React.createElement("img", {src: "/img/ajax.gif"})
+                            React.createElement("img", {src: "/careselector-admin/img/ajax.gif"})
                         )
                     ), 
                 
@@ -149,7 +149,7 @@ var LoginForm = React.createClass({displayName: "LoginForm",
                             
                              this.props.saving &&
                             React.createElement("div", {className: "text-center"}, 
-                                React.createElement("img", {src: "/img/ajax.gif"})
+                                React.createElement("img", {src: "/careselector-admin/img/ajax.gif"})
                             ), 
                             
                             React.createElement("hr", null)
@@ -395,7 +395,7 @@ var LoginForm = React.createClass({displayName: "LoginForm",
 
                      this.props.loading &&
                         React.createElement("div", {className: "text-center"}, 
-                            React.createElement("img", {src: "/img/ajax.gif"})
+                            React.createElement("img", {src: "/careselector-admin/img/ajax.gif"})
                         )
                     
 
@@ -532,7 +532,7 @@ var LoginForm = React.createClass({displayName: "LoginForm",
                 ), 
                  this.props.loading &&
                     React.createElement("div", {className: "text-center"}, 
-                        React.createElement("img", {src: "/img/ajax.gif"})
+                        React.createElement("img", {src: "/careselector-admin/img/ajax.gif"})
                     )
                 
             )
