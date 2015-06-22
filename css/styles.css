@@ -902,15 +902,9 @@ section:last-child {
 .purple {
     color: #7D66C3;
 }
-table tr th,table tr td {
-    text-align: center;
-}
-table tr:nth-child(odd){
-    background: #EBEBEB;
-}
-table tr:nth-child(even){
-    background: white;
-}
+
+
+
 table tr th,table tr td {
     width:50%;
 }
@@ -920,4 +914,9 @@ table.grey tr:nth-child(even){
 input[type="file"]{
     max-width: 232px;
     margin-top: 20px;
+}
+
+img {
+    width:auto;
+    height:auto;
 }

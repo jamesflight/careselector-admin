@@ -4,17 +4,11 @@ var sourcemaps = require('gulp-sourcemaps');
 var jshint = require('gulp-jshint');
 var source = require('vinyl-source-stream');
 var buffer = require('vinyl-buffer');
+var streamify = require('gulp-streamify');
 var browserify = require('browserify');
 var reactify = require('reactify');
 var watchify = require('watchify');
 var stringify = require('stringify');
-
-gulp.task('browserify', function() {
-    return browserify('./test/main.js')
-        .bundle()
-        .pipe(source('app.js'))
-        .pipe(gulp.dest('./testdist/'));
-});
 
 gulp.task('watch', function() {
     var bundler = browserify({
@@ -30,14 +24,18 @@ gulp.task('watch', function() {
     bundler.on('update', rebundle);
 
     function rebundle() {
-        var date = new Date();
         bundler.bundle()
             .pipe(source('app.js'))
             .pipe(buffer())
+            .pipe(sourcemaps.init({loadMaps: true}))
+            //.pipe(uglify())
+            .pipe(sourcemaps.write('./js/dist/'))
             .pipe(gulp.dest('./js/dist/'));
-        var ms = (new Date()).getTime() - date.getTime();
-        console.log('Rebundled in ' + ms + ' ms');
     }
+
+    bundler.on('log', function (msg) {
+        console.log(msg);
+    });
 
     return rebundle();
 });

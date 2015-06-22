@@ -8,10 +8,14 @@ var SaveProvider = require('./services/providers/SaveProvider.js');
 module.exports = {
     attemptAuth: function (credentials) {
         this.dispatch(constants.ATTEMPT_AUTH);
-        return AttemptAuth(credentials).then(function(response) {
-            SetToken(response.token);
-            this.dispatch(constants.ATTEMPT_AUTH_SUCCESS);
-        }.bind(this));
+        return AttemptAuth(credentials)
+            .then(function(response) {
+                SetToken(response.token);
+                this.dispatch(constants.ATTEMPT_AUTH_SUCCESS);
+            }.bind(this))
+            .catch(function (e, response) {
+                this.dispatch(constants.ATTEMPT_AUTH_FAIL, response.errors);
+            }.bind(this));
     },
     loadBristolProviders: function() {
         this.dispatch(constants.LOAD_BRISTOL_PROVIDERS);

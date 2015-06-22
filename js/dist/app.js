@@ -8,10 +8,12 @@ var actions = require('./actions.js');
 var Fluxxor = require("fluxxor");
 var BristolProvidersStore = require('./stores/BristolProvidersStore.js');
 var EditProviderStore = require('./stores/EditProviderStore.js');
+var AuthStore = require('./stores/AuthStore.js');
 
 var stores = {
     BristolProvidersStore: new BristolProvidersStore(),
-    EditProviderStore: new EditProviderStore()
+    EditProviderStore: new EditProviderStore(),
+    AuthStore: new AuthStore()
 };
 
 var flux = new Fluxxor.Flux(stores, actions);
@@ -19,7 +21,7 @@ Router.run(routes, function (Handler) {
     React.render(React.createElement(Handler, {flux: flux}), document.getElementById("app"));
 });
 
-},{"./App.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/App.jsx","./actions.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/actions.js","./routes.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/routes.jsx","./stores/BristolProvidersStore.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/BristolProvidersStore.js","./stores/EditProviderStore.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/EditProviderStore.js","fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/App.jsx":[function(require,module,exports){
+},{"./App.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/App.jsx","./actions.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/actions.js","./routes.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/routes.jsx","./stores/AuthStore.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/AuthStore.js","./stores/BristolProvidersStore.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/BristolProvidersStore.js","./stores/EditProviderStore.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/EditProviderStore.js","fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/App.jsx":[function(require,module,exports){
 var React = require('react');
 var Router = require('react-router'); // or var Router = ReactRouter; in browsers
 var actions = require('./actions.js');
@@ -53,10 +55,14 @@ var SaveProvider = require('./services/providers/SaveProvider.js');
 module.exports = {
     attemptAuth: function (credentials) {
         this.dispatch(constants.ATTEMPT_AUTH);
-        return AttemptAuth(credentials).then(function(response) {
-            SetToken(response.token);
-            this.dispatch(constants.ATTEMPT_AUTH_SUCCESS);
-        }.bind(this));
+        return AttemptAuth(credentials)
+            .then(function(response) {
+                SetToken(response.token);
+                this.dispatch(constants.ATTEMPT_AUTH_SUCCESS);
+            }.bind(this))
+            .catch(function (e, response) {
+                this.dispatch(constants.ATTEMPT_AUTH_FAIL, response.errors);
+            }.bind(this));
     },
     loadBristolProviders: function() {
         this.dispatch(constants.LOAD_BRISTOL_PROVIDERS);
@@ -80,11 +86,15 @@ module.exports = {
 
 },{"./constants.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/constants.js","./services/auth/AttemptAuth.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/AttemptAuth.js","./services/auth/SetToken.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/SetToken.js","./services/providers/GetBristolProviders.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/GetBristolProviders.js","./services/providers/GetProvider.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/GetProvider.js","./services/providers/SaveProvider.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/SaveProvider.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/EditProviderForm.jsx":[function(require,module,exports){
 var React = require('react');
+var TinyMCE = require('react-tinymce');
+var MoneyInput = require('./MoneyInput.jsx');
 
 var LoginForm = React.createClass({displayName: "LoginForm",
     propTypes: {
-        provider: React.PropTypes.object,
-        onSaveProvider: React.PropTypes.func
+        provider: React.PropTypes.object.isRequired,
+        onSaveProvider: React.PropTypes.func.isRequired,
+        loading:React.PropTypes.bool.isRequired,
+        saving:React.PropTypes.bool.isRequired
     },
     getInitialState: function () {
         return {
@@ -95,12 +105,19 @@ var LoginForm = React.createClass({displayName: "LoginForm",
         this.setState({
             provider:newProps.provider
         });
-        console.log(newProps);
     },
     updateField: function (event) {
         var state = this.state;
         state.provider[event.target.dataset.field] = event.target.value;
         this.setState(state);
+    },
+    updatePrice: function (event) {
+        var state = this.state;
+        state.provider['price'] = event.target.value;
+        this.setState(state);
+    },
+    updateNotes: function (event) {
+        this.state.provider['notes'] = event.target.getContent();
     },
     updateCheckbox: function (event) {
         var state = this.state;
@@ -113,136 +130,191 @@ var LoginForm = React.createClass({displayName: "LoginForm",
     render: function(){
         return (
             React.createElement("div", null, 
-
-                React.createElement("section", {className: "orange"}, 
-                    React.createElement("h1", null, "Home Details"), 
-
-                    React.createElement("h2", null, "Details"), 
-                    React.createElement("div", {className: "table-responsive"}, 
-                        React.createElement("table", {className: "table table-bordered grey"}, 
-                            React.createElement("tbody", null, 
-                                React.createElement("tr", null, 
-                                    React.createElement("th", null, "Name"), 
-                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "name", onChange: this.updateField, value: this.state.provider.name, type: "text"}))
-                                ), 
-
-                                React.createElement("tr", null, 
-                                    React.createElement("th", null, "Local Authority"), 
-                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "local_authority", onChange: this.updateField, value: this.state.provider.local_authority, type: "text"}))
-                                ), 
-                                React.createElement("tr", null, 
-                                    React.createElement("th", null, "Address 1"), 
-                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "address_1", onChange: this.updateField, value: this.state.provider.address_1, type: "text"}))
-                                ), 
-                                React.createElement("tr", null, 
-                                    React.createElement("th", null, "Address 2"), 
-                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "address_2", onChange: this.updateField, value: this.state.provider.address_2, type: "text"}))
-                                ), 
-                                React.createElement("tr", null, 
-                                    React.createElement("th", null, "Address 3"), 
-                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "address_3", onChange: this.updateField, value: this.state.provider.address_3, type: "text"}))
-                                ), 
-                                React.createElement("tr", null, 
-                                    React.createElement("th", null, "Address 4"), 
-                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "address_4", onChange: this.updateField, value: this.state.provider.address_4, type: "text"}))
-                                ), 
-                                React.createElement("tr", null, 
-                                    React.createElement("th", null, "Postcode"), 
-                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "postcode", onChange: this.updateField, value: this.state.provider.postcode, type: "text"}))
-                                ), 
-                                React.createElement("tr", null, 
-                                    React.createElement("th", null, "Phone"), 
-                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "phone", onChange: this.updateField, value: this.state.provider.phone, type: "text"}))
-                                ), 
-                                React.createElement("tr", null, 
-                                    React.createElement("th", null, "Website"), 
-                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "website", onChange: this.updateField, value: this.state.provider.website, type: "text"}))
-                                ), 
-                                React.createElement("tr", null, 
-                                    React.createElement("th", null, "Contact Name"), 
-                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "contact_name", onChange: this.updateField, value: this.state.provider.contact_name, type: "text"}))
-                                ), 
-                                React.createElement("tr", null, 
-                                    React.createElement("th", null, "CQC Score"), 
-                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "cqc_score", onChange: this.updateField, value: this.state.provider.cqc_score, type: "number"}))
-                                ), 
-                                React.createElement("tr", null, 
-                                    React.createElement("th", null, "CQC Location ID"), 
-                                    React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "cqc_location", onChange: this.updateField, value: this.state.provider.cqc_location, type: "text"}))
-                                )
-                            )
+                 this.props.loading &&
+                    React.createElement("div", null, 
+                        React.createElement("br", null), React.createElement("br", null), React.createElement("br", null), 
+                        React.createElement("div", {className: "text-center"}, 
+                            React.createElement("img", {src: "/img/ajax.gif"})
                         )
-                    )
-                ), 
-                React.createElement("section", {className: "purple"}, 
-
-                    React.createElement("h1", null, "Home Features"), 
-
-
-                        React.createElement("h2", null, "Main Features"), 
-                        React.createElement("div", {className: "table-responsive"}, 
-                            React.createElement("table", {className: "table table-bordered"}, 
-                                React.createElement("tbody", null, 
-                                    React.createElement("tr", null, 
-                                        React.createElement("th", null, "Service Type"), 
-                                        React.createElement("td", {tabindex: "1"}, 
-                                            React.createElement("select", {className: "form-control", value: this.state.provider.service_type}, 
-                                                React.createElement("option", {value: "CARE_HOME"}, "Care Home"), 
-                                                React.createElement("option", {value: "NURSING_HOME"}, "Nursing Home"), 
-                                                React.createElement("option", {value: "HOME_CARE"}, "Home Care")
-                                            )
-                                        )
+                    ), 
+                
+                 ! this.props.loading &&
+                    React.createElement("div", {className: "row"}, 
+                        React.createElement("div", {className: "col-xs-12"}, 
+                            React.createElement("h1", {className: "page-header"}, this.state.provider.name)
+                        ), 
+                        React.createElement("div", {className: "col-xs-12"}, 
+                             ! this.props.saving &&
+                            React.createElement("button", {className: "btn btn-lg btn-success", onClick: this.saveProvider}, React.createElement("i", {className: "fa fa-floppy-o fa-lg"}), " Save"), 
+                            
+                             this.props.saving &&
+                            React.createElement("div", {className: "text-center"}, 
+                                React.createElement("img", {src: "/img/ajax.gif"})
+                            ), 
+                            
+                            React.createElement("hr", null)
+                        ), 
+                        React.createElement("div", {className: "col-xs-4"}, 
+                            React.createElement("div", {className: "panel panel-red"}, 
+                                React.createElement("div", {className: "panel-heading"}, 
+                                "General Details"
+                                ), 
+                                React.createElement("div", {className: "panel-body"}, 
+                                    React.createElement("div", {className: "form-group"}, 
+                                        React.createElement("label", null, "Name"), 
+                                        React.createElement("input", {className: "form-control", "data-field": "name", onChange: this.updateField, value: this.state.provider.name, type: "text"})
                                     ), 
 
-                                    React.createElement("tr", null, 
-                                        React.createElement("th", null, "Total Beds"), 
-                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "total_beds", onChange: this.updateField, value: this.state.provider.total_beds, type: "number"}))
-                                    ), 
-                                    React.createElement("tr", null, 
-                                        React.createElement("th", null, "Under 65"), 
-                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_under_65", onChange: this.updateCheckbox, checked: this.state.provider.service_under_65, type: "checkbox"}))
-                                    ), 
-                                    React.createElement("tr", null, 
-                                        React.createElement("th", null, "Over 65"), 
-                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_over_65", onChange: this.updateCheckbox, checked: this.state.provider.service_over_65, type: "checkbox"}))
-                                    ), 
-                                    React.createElement("tr", null, 
-                                        React.createElement("th", null, "Dementia"), 
-                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_dementia", onChange: this.updateCheckbox, checked: this.state.provider.service_dementia, type: "checkbox"}))
+                                    React.createElement("div", {className: "form-group"}, 
+                                        React.createElement("label", null, "Local Authority"), 
+                                        React.createElement("input", {className: "form-control", "data-field": "local_authority", onChange: this.updateField, value: this.state.provider.local_authority, type: "text"})
                                     ), 
 
-                                    React.createElement("tr", null, 
-                                        React.createElement("th", null, "Learning Disability"), 
-                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_learning_disability", onChange: this.updateCheckbox, checked: this.state.provider.service_learning_disability, type: "checkbox"}))
+                                    React.createElement("div", {className: "form-group"}, 
+                                        React.createElement("label", null, "Address"), 
+                                        React.createElement("input", {className: "form-control", "data-field": "address_1", onChange: this.updateField, value: this.state.provider.address_1, type: "text"}), 
+                                        React.createElement("input", {className: "form-control", "data-field": "address_2", onChange: this.updateField, value: this.state.provider.address_2, type: "text"}), 
+                                        React.createElement("input", {className: "form-control", "data-field": "address_3", onChange: this.updateField, value: this.state.provider.address_3, type: "text"}), 
+                                        React.createElement("input", {className: "form-control", "data-field": "address_4", onChange: this.updateField, value: this.state.provider.address_4, type: "text"})
                                     ), 
-                                    React.createElement("tr", null, 
-                                        React.createElement("th", null, "Physical Disability"), 
-                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_physical_disability", onChange: this.updateCheckbox, checked: this.state.provider.service_physical_disability, type: "checkbox"}))
+
+                                    React.createElement("div", {className: "form-group"}, 
+                                        React.createElement("label", null, "Postcode"), 
+                                        React.createElement("input", {className: "form-control", "data-field": "postcode", onChange: this.updateField, value: this.state.provider.postcode, type: "text"})
                                     ), 
-                                    React.createElement("tr", null, 
-                                        React.createElement("th", null, "Sensory Impairment"), 
-                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_sensory_impairment", onChange: this.updateCheckbox, checked: this.state.provider.service_sensory_impairment, type: "checkbox"}))
+
+                                    React.createElement("div", {className: "form-group"}, 
+                                        React.createElement("label", null, "Phone"), 
+                                        React.createElement("input", {className: "form-control", "data-field": "phone", onChange: this.updateField, value: this.state.provider.phone, type: "text"})
                                     ), 
-                                    React.createElement("tr", null, 
-                                        React.createElement("th", null, "Mental Health"), 
-                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_mental_health", onChange: this.updateCheckbox, checked: this.state.provider.service_mental_health, type: "checkbox"}))
+
+                                    React.createElement("div", {className: "form-group"}, 
+                                        React.createElement("label", null, "Website"), 
+                                        React.createElement("input", {className: "form-control", "data-field": "website", onChange: this.updateField, value: this.state.provider.website, type: "text"})
                                     ), 
-                                    React.createElement("tr", null, 
-                                        React.createElement("th", null, "Substance Misuse"), 
-                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_substance_misuse", onChange: this.updateCheckbox, checked: this.state.provider.service_substance_misuse, type: "checkbox"}))
+
+                                    React.createElement("div", {className: "form-group"}, 
+                                        React.createElement("label", null, "Contact Name"), 
+                                        React.createElement("input", {className: "form-control", "data-field": "contact_name", onChange: this.updateField, value: this.state.provider.contact_name, type: "text"})
                                     ), 
-                                    React.createElement("tr", null, 
-                                        React.createElement("th", null, "Eating Disorders"), 
-                                        React.createElement("td", {tabindex: "1"}, React.createElement("input", {className: "form-control", "data-field": "service_eating_disorders", onChange: this.updateCheckbox, checked: this.state.provider.service_eating_disorders, type: "checkbox"}))
+
+                                    React.createElement("div", {className: "form-group"}, 
+                                        React.createElement("label", null, "CQC Score"), 
+                                        React.createElement("input", {className: "form-control", "data-field": "cqc_score", onChange: this.updateField, value: this.state.provider.cqc_score, type: "number"})
+                                    ), 
+                                    React.createElement("div", {className: "form-group"}, 
+                                        React.createElement("label", null, "CQC Location Id"), 
+                                        React.createElement("input", {className: "form-control", "data-field": "cqc_location", onChange: this.updateField, value: this.state.provider.cqc_location, type: "text"})
+                                    ), 
+                                    React.createElement("div", {className: "form-group"}, 
+                                        React.createElement("label", null, "Care Home Manager Name"), 
+                                        React.createElement("input", {className: "form-control", "data-field": "care_home_manager_name", onChange: this.updateField, value: this.state.provider.care_home_manager_name, type: "text"})
+                                    ), 
+                                    React.createElement("div", {className: "form-group"}, 
+                                        React.createElement("label", null, "Care Home Manager Email"), 
+                                        React.createElement("input", {className: "form-control", "data-field": "care_home_manager_email", onChange: this.updateField, value: this.state.provider.care_home_manager_email, type: "text"})
+                                    ), 
+                                    React.createElement("div", {className: "form-group"}, 
+                                        React.createElement("label", null, "Care Home Manager Phone"), 
+                                        React.createElement("input", {className: "form-control", "data-field": "care_home_manager_phone", onChange: this.updateField, value: this.state.provider.care_home_manager_phone, type: "text"})
                                     )
                                 )
                             )
                         ), 
-                React.createElement("div", {className: "text-center"}, 
-                    React.createElement("button", {className: "btn btn-lg btn-warning", onClick: this.saveProvider}, "Save Provider")
-                )
+                        React.createElement("div", {className: "col-xs-8"}, 
+                            React.createElement("div", {className: "panel panel-yellow"}, 
+                                React.createElement("div", {className: "panel-heading"}, 
+                                    "Notes"
+                                ), 
+                                React.createElement("div", {className: "panel-body", key: "tinymce"}, 
+                                    React.createElement(TinyMCE, {
+                                    content: this.state.provider.notes, 
+                                    config: {
+                                        menubar:'',
+                                        plugins: '',
+                                        toolbar: 'undo redo | bold italic underline'
+                                    }, 
+                                    onChange: this.updateNotes}
+                                    )
+                                )
+                            ), 
+                            React.createElement("div", {className: "panel panel-green"}, 
+                                React.createElement("div", {className: "panel-heading"}, 
+                                    "Services"
+                                ), 
+                                React.createElement("div", {className: "panel-body"}, 
+                                    React.createElement("div", {className: "form-group"}, 
+                                        React.createElement("label", null, "Service Type"), 
+                                        React.createElement("select", {className: "form-control", onChange: this.updateField, "data-field": "service_type", value: this.state.provider.service_type}, 
+                                            React.createElement("option", {value: "CARE_HOME"}, "Care Home"), 
+                                            React.createElement("option", {value: "NURSING_HOME"}, "Nursing Home"), 
+                                            React.createElement("option", {value: "HOME_CARE"}, "Home Care")
+                                        )
+                                    ), 
+                                    React.createElement("div", {className: "form-group"}, 
 
-                )
+                                        React.createElement("label", null, "Specialisms"), 
+                                        React.createElement("div", {class: "checkbox"}, 
+                                            React.createElement("label", null, 
+                                                React.createElement("input", {"data-field": "service_under_65", onChange: this.updateCheckbox, checked: this.state.provider.service_under_65, type: "checkbox"}), " Under 65"
+                                            )
+                                        ), 
+                                        React.createElement("div", {class: "checkbox"}, 
+                                            React.createElement("label", null, 
+                                                React.createElement("input", {"data-field": "service_over_65", onChange: this.updateCheckbox, checked: this.state.provider.service_over_65, type: "checkbox"}), " Over 65"
+                                            )
+                                        ), 
+                                        React.createElement("div", {class: "checkbox"}, 
+                                            React.createElement("label", null, 
+                                                React.createElement("input", {"data-field": "service_dementia", onChange: this.updateCheckbox, checked: this.state.provider.service_dementia, type: "checkbox"}), " Dementia"
+                                            )
+                                        ), 
+                                        React.createElement("div", {class: "checkbox"}, 
+                                            React.createElement("label", null, 
+                                                React.createElement("input", {"data-field": "service_learning_disability", onChange: this.updateCheckbox, checked: this.state.provider.service_learning_disability, type: "checkbox"}), " Learning Disability"
+                                            )
+                                        ), 
+                                        React.createElement("div", {class: "checkbox"}, 
+                                            React.createElement("label", null, 
+                                                React.createElement("input", {"data-field": "service_physical_disability", onChange: this.updateCheckbox, checked: this.state.provider.service_physical_disability, type: "checkbox"}), " Physical Disability"
+                                            )
+                                        ), 
+                                        React.createElement("div", {class: "checkbox"}, 
+                                            React.createElement("label", null, 
+                                                React.createElement("input", {"data-field": "service_sensory_impairment", onChange: this.updateCheckbox, checked: this.state.provider.service_sensory_impairment, type: "checkbox"}), " Sensory Impairment"
+                                            )
+                                        ), 
+                                        React.createElement("div", {class: "checkbox"}, 
+                                            React.createElement("label", null, 
+                                                React.createElement("input", {"data-field": "service_mental_health", onChange: this.updateCheckbox, checked: this.state.provider.service_mental_health, type: "checkbox"}), " Mental Health"
+                                            )
+                                        ), 
+                                        React.createElement("div", {class: "checkbox"}, 
+                                            React.createElement("label", null, 
+                                                React.createElement("input", {"data-field": "service_substance_misuse", onChange: this.updateCheckbox, checked: this.state.provider.service_substance_misuse, type: "checkbox"}), " Substance Misuse"
+                                            )
+                                        ), 
+
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "Total Beds"), 
+                                            React.createElement("input", {className: "form-control", "data-field": "total_beds", onChange: this.updateField, value: this.state.provider.total_beds, type: "number"})
+                                        ), 
+
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "Availability"), 
+                                            React.createElement("input", {className: "form-control", "data-field": "availability", onChange: this.updateField, value: this.state.provider.availability, type: "text"})
+                                        ), 
+
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "Price"), 
+                                            React.createElement(MoneyInput, {className: "form-control", onChange: this.updatePrice, value: this.state.provider.price})
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                    
             )
         );
     }
@@ -250,7 +322,7 @@ var LoginForm = React.createClass({displayName: "LoginForm",
 
 module.exports = LoginForm;
 
-},{"react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/Example.jsx":[function(require,module,exports){
+},{"./MoneyInput.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/MoneyInput.jsx","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-tinymce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/lib/main.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/Example.jsx":[function(require,module,exports){
 var React = require('react');
 var Navigation = require('react-router').Navigation;
 var Fluxxor = require('fluxxor');
@@ -278,7 +350,9 @@ var FluxMixin = Fluxxor.FluxMixin(React);
 var LoginForm = React.createClass({displayName: "LoginForm",
     mixins: [FluxMixin, Navigation],
     propTypes: {
-       onSubmit: React.PropTypes.func
+        onSubmit: React.PropTypes.func.isRequired,
+        loading: React.PropTypes.bool.isRequired,
+        errors: React.PropTypes.array.isRequired
     },
     submit: function () {
         var email = React.findDOMNode(this.refs.email).value;
@@ -288,27 +362,43 @@ var LoginForm = React.createClass({displayName: "LoginForm",
             email:email,
             password:password
         });
+        return false;
     },
     render: function(){
         return (
-            React.createElement("div", {className: "row"}, 
-                React.createElement("br", null), React.createElement("br", null), React.createElement("br", null), 
-                React.createElement("div", {className: "col-xs-4 col-xs-offset-4"}, 
-                    React.createElement("div", {className: "panel panel-default"}, 
-                        React.createElement("div", {className: "panel-heading"}, 
-                            React.createElement("h3", {className: "panel-title"}, "Please Sign In")
-                        ), 
-                        React.createElement("div", {className: "panel-body"}, 
-                            React.createElement("div", {className: "form-group"}, 
-                                React.createElement("input", {ref: "email", className: "form-control", placeholder: "E-mail", name: "email", type: "email", autofocus: ""})
-                            ), 
-                            React.createElement("div", {className: "form-group"}, 
-                                React.createElement("input", {ref: "password", className: "form-control", placeholder: "Password", name: "password", type: "password"})
-                            ), 
+            React.createElement("form", {onSubmit: this.submit, className: "panel panel-default"}, 
+                React.createElement("div", {className: "panel-heading"}, 
+                    React.createElement("h3", {className: "panel-title"}, "Please Sign In")
+                ), 
 
-                            React.createElement("button", {onClick: this.submit, className: "btn btn-lg btn-success btn-block"}, "Login")
+                React.createElement("div", {className: "panel-body"}, 
+                    this.props.errors.map(function(error) {
+                        return (
+                            React.createElement("div", null, 
+                                React.createElement("div", {className: "alert alert-danger"}, 
+                           error
+                                )
+                            )
                         )
-                    )
+                    }.bind(this)), 
+
+                    React.createElement("div", {className: "form-group"}, 
+                        React.createElement("input", {ref: "email", className: "form-control", placeholder: "E-mail", name: "email", type: "email", autofocus: ""})
+                    ), 
+                    React.createElement("div", {className: "form-group"}, 
+                        React.createElement("input", {ref: "password", className: "form-control", placeholder: "Password", name: "password", type: "password"})
+                    ), 
+
+                     ! this.props.loading &&
+                        React.createElement("button", {className: "btn btn-lg btn-success btn-block"}, "Login"), 
+                    
+
+                     this.props.loading &&
+                        React.createElement("div", {className: "text-center"}, 
+                            React.createElement("img", {src: "/img/ajax.gif"})
+                        )
+                    
+
                 )
             )
         );
@@ -317,13 +407,94 @@ var LoginForm = React.createClass({displayName: "LoginForm",
 
 module.exports = LoginForm;
 
-},{"fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/ProviderTable.jsx":[function(require,module,exports){
+},{"fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/MoneyInput.jsx":[function(require,module,exports){
+var React = require('react');
+
+var MoneyInput = React.createClass({displayName: "MoneyInput",
+    propTypes:{
+        value:React.PropTypes.number.isRequired,
+        className:React.PropTypes.string,
+        onChange:React.PropTypes.func.isRequired
+    },
+    getInitialState: function () {
+        return {
+            amount:this.props.value/100
+        }
+    },
+    componentWillReceiveProps: function (newProps) {
+        this.setState({
+            amount:(newProps.value / 100)
+        });
+    },
+    changeAmount: function (e) {
+        var val = e.target.value;
+
+        this.setState({
+            amount: val
+        });
+        e.target.value = Math.floor(val * 100);
+        this.props.onChange(e);
+
+    },
+    render: function(){
+        return (
+                React.createElement("div", {className: "form-inline"}, 
+                    React.createElement("div", {className: "form-group"}, 
+                        React.createElement("div", {className: "input-group"}, 
+                            React.createElement("div", {className: "input-group-addon"}, "£"), 
+                            React.createElement("input", {onChange: this.changeAmount, value: this.state.amount, type: "number", step: "1", className: "form-control"}), 
+                            React.createElement("div", {className: "input-group-addon"}, ".00")
+                        )
+                    )
+                )
+        );
+    }
+});
+
+module.exports = MoneyInput;
+
+},{"react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/PageLayout.jsx":[function(require,module,exports){
+var React = require('react');
+var Link = require('react-router').Link;
+
+var PageLayout = React.createClass({displayName: "PageLayout",
+    render: function(){
+        return (
+            React.createElement("div", {id: "wrapper"}, 
+                React.createElement("nav", {className: "navbar navbar-default navbar-static-top", role: "navigation", style: {'margin-bottom':0}}, 
+                    React.createElement("div", {className: "navbar-header"}, 
+                        React.createElement("span", {className: "navbar-brand"}, "Careselector - Database Admin")
+                    ), 
+
+                React.createElement("div", {className: "navbar-default sidebar"}, 
+                    React.createElement("div", {className: "sidebar-nav navbar-collapse"}, 
+                        React.createElement("ul", {className: "nav in", id: "side-menu"}, 
+                            React.createElement("li", null, 
+                                React.createElement(Link, {to: "/index"}, "Bristol Care Homes")
+                            )
+                        )
+                    )
+                )
+                ), 
+
+                React.createElement("div", {id: "page-wrapper"}, 
+                    this.props.children
+                )
+            )
+        );
+    }
+});
+
+module.exports = PageLayout;
+
+},{"react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/ProviderTable.jsx":[function(require,module,exports){
 var React = require('react');
 
 var LoginForm = React.createClass({displayName: "LoginForm",
     propTypes: {
-        providers: React.PropTypes.array,
-        onSelectProvider: React.PropTypes.func
+        providers: React.PropTypes.array.isRequired,
+        onSelectProvider: React.PropTypes.func.isRequired,
+        loading:React.PropTypes.bool.isRequired
     },
     submit: function () {
         var email = React.findDOMNode(this.refs.email).value;
@@ -340,24 +511,30 @@ var LoginForm = React.createClass({displayName: "LoginForm",
     render: function(){
         return (
             React.createElement("div", null, 
-            React.createElement("table", {className: "table table-striped"}, 
-                React.createElement("thead", null, 
-                React.createElement("tr", null, 
-                    React.createElement("th", null, "Name"), 
-                    React.createElement("th", null, "CQC Id")
-                )
-                    ), 
-                React.createElement("tbody", null, 
-                    this.props.providers.map(function (provider) {
-                        return (
-                            React.createElement("tr", null, 
-                                React.createElement("td", null, React.createElement("span", {className: "link", onClick: this.selectProvider, "data-id": provider.id}, provider.name)), 
-                                React.createElement("td", null, provider.cqc_id)
-                            )
+                React.createElement("h1", {className: "page-header"}, "Bristol Care Homes"), 
+                React.createElement("table", {className: "table table-striped table-bordered table-hover"}, 
+                    React.createElement("thead", null, 
+                        React.createElement("tr", null, 
+                            React.createElement("th", null, "Name"), 
+                            React.createElement("th", null, "CQC Id")
                         )
-                    }.bind(this))
-                )
-            )
+                    ), 
+                    React.createElement("tbody", null, 
+                        this.props.providers.map(function (provider) {
+                            return (
+                                React.createElement("tr", null, 
+                                    React.createElement("td", null, React.createElement("span", {className: "link", onClick: this.selectProvider, "data-id": provider.id}, provider.name)), 
+                                    React.createElement("td", null, provider.cqc_id)
+                                )
+                            )
+                        }.bind(this))
+                    )
+                ), 
+                 this.props.loading &&
+                    React.createElement("div", {className: "text-center"}, 
+                        React.createElement("img", {src: "/img/ajax.gif"})
+                    )
+                
             )
         );
     }
@@ -374,6 +551,7 @@ module.exports = {
 module.exports = {
     ATTEMPT_AUTH: "ATTEMPT_AUTH",
     ATTEMPT_AUTH_SUCCESS:"ATTEMPT_AUTH_SUCCESS",
+    ATTEMPT_AUTH_FAIL:"ATTEMPT_AUTH_FAIL",
     LOAD_BRISTOL_PROVIDERS:"LOAD_BRISTOL_PROVIDERS",
     LOAD_BRISTOL_PROVIDERS_SUCCESS:"LOAD_BRISTOL_PROVIDERS_SUCCESS",
     LOAD_PROVIDER_FOR_EDITING:"LOAD_PROVIDER_FOR_EDITING",
@@ -390,6 +568,7 @@ var ProviderTable = require('./../components/ProviderTable.jsx');
 var StoreWatchMixin = Fluxxor.StoreWatchMixin;
 var Navigation = require('react-router').Navigation;
 var EditProviderForm = require('./../components/EditProviderForm.jsx');
+var PageLayout = require('./../components/PageLayout.jsx');
 
 var EditProvider = React.createClass({displayName: "EditProvider",
     mixins: [FluxMixin, StoreWatchMixin('EditProviderStore'), Navigation],
@@ -397,8 +576,11 @@ var EditProvider = React.createClass({displayName: "EditProvider",
         router: React.PropTypes.func
     },
     getStateFromFlux: function () {
+        var flux = this.getFlux();
         return {
-            provider: this.getFlux().store('EditProviderStore').getProvider()
+            provider: flux.store('EditProviderStore').getProvider(),
+            loading: flux.store('EditProviderStore').isLoading(),
+            saving: flux.store('EditProviderStore').isSaving()
         }
     },
     componentDidMount: function () {
@@ -409,12 +591,13 @@ var EditProvider = React.createClass({displayName: "EditProvider",
     },
     render: function() {
         return (
-            React.createElement("div", {className: "container"}, 
+            React.createElement(PageLayout, null, 
                 React.createElement("div", null, 
-                    React.createElement("div", {className: "row"}, 
-                        React.createElement("div", {className: "col-xs-6 col-xs-offset-3"}, 
-                            React.createElement(EditProviderForm, {provider: this.state.provider, onSaveProvider: this.saveProvider})
-                        )
+                    React.createElement(EditProviderForm, {
+                    provider: this.state.provider, 
+                    onSaveProvider: this.saveProvider, 
+                    loading: this.state.loading, 
+                    saving: this.state.saving}
                     )
                 )
             )
@@ -424,7 +607,7 @@ var EditProvider = React.createClass({displayName: "EditProvider",
 
 module.exports = EditProvider;
 
-},{"./../components/EditProviderForm.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/EditProviderForm.jsx","./../components/ProviderTable.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/ProviderTable.jsx","fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/Example.jsx":[function(require,module,exports){
+},{"./../components/EditProviderForm.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/EditProviderForm.jsx","./../components/PageLayout.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/PageLayout.jsx","./../components/ProviderTable.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/ProviderTable.jsx","fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/Example.jsx":[function(require,module,exports){
 var React = require('react');
 var Fluxxor = require('fluxxor');
 var FluxMixin = Fluxxor.FluxMixin(React);
@@ -456,12 +639,15 @@ var FluxMixin = Fluxxor.FluxMixin(React);
 var ProviderTable = require('./../components/ProviderTable.jsx');
 var StoreWatchMixin = Fluxxor.StoreWatchMixin;
 var Navigation = require('react-router').Navigation;
+var PageLayout = require('./../components/PageLayout.jsx');
 
 var Index = React.createClass({displayName: "Index",
     mixins: [FluxMixin, StoreWatchMixin('BristolProvidersStore'), Navigation],
     getStateFromFlux: function () {
+        var flux = this.getFlux();
         return {
-            providers: this.getFlux().store('BristolProvidersStore').getProviders()
+            providers: flux.store('BristolProvidersStore').getProviders(),
+            loading:flux.store('BristolProvidersStore').isLoading()
         }
     },
     componentDidMount: function () {
@@ -473,12 +659,10 @@ var Index = React.createClass({displayName: "Index",
     },
     render: function() {
         return (
-            React.createElement("div", {className: "container"}, 
-                React.createElement("div", null, 
-                    React.createElement("div", {className: "row"}, 
-                        React.createElement("div", {className: "col-xs-12"}, 
-                            React.createElement(ProviderTable, {onSelectProvider: this.redirect, providers: this.state.providers})
-                        )
+            React.createElement(PageLayout, null, 
+                React.createElement("div", {className: "row"}, 
+                    React.createElement("div", {className: "col-xs-12"}, 
+                        React.createElement(ProviderTable, {onSelectProvider: this.redirect, providers: this.state.providers, loading: this.state.loading})
                     )
                 )
             )
@@ -488,15 +672,24 @@ var Index = React.createClass({displayName: "Index",
 
 module.exports = Index;
 
-},{"./../components/ProviderTable.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/ProviderTable.jsx","fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/Login.jsx":[function(require,module,exports){
+},{"./../components/PageLayout.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/PageLayout.jsx","./../components/ProviderTable.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/ProviderTable.jsx","fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/index.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-router":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/Login.jsx":[function(require,module,exports){
 var React = require('react');
 var Fluxxor = require('fluxxor');
 var FluxMixin = Fluxxor.FluxMixin(React);
 var LoginForm = require('./../components/LoginForm.jsx');
 var Navigation = require('react-router').Navigation;
+var StoreWatchMixin = Fluxxor.StoreWatchMixin;
 
 var Login = React.createClass({displayName: "Login",
-    mixins: [FluxMixin, Navigation],
+    mixins: [FluxMixin, Navigation, StoreWatchMixin('AuthStore')],
+    getStateFromFlux: function () {
+        var flux = this.getFlux();
+
+        return {
+            loading:flux.store('AuthStore').isLoading(),
+            errors:flux.store('AuthStore').getErrors()
+        }
+    },
     attemptLogin: function (credentials) {
         this.getFlux().actions.attemptAuth(credentials)
             .then(function () {
@@ -505,15 +698,20 @@ var Login = React.createClass({displayName: "Login",
     },
     render: function() {
         return (
-            React.createElement("div", {className: "container"}, 
-                React.createElement("div", null, 
-                    React.createElement("div", {className: "row"}, 
-                        React.createElement("div", {className: "col-xs-12"}, 
-                            React.createElement(LoginForm, {onSubmit: this.attemptLogin})
+                React.createElement("div", {className: "container"}, 
+                    React.createElement("div", null, 
+                        React.createElement("div", {className: "row"}, 
+                            React.createElement("div", {className: "col-xs-12"}, 
+                                React.createElement("div", {className: "row"}, 
+                                    React.createElement("br", null), React.createElement("br", null), React.createElement("br", null), 
+                                    React.createElement("div", {className: "col-xs-4 col-xs-offset-4"}, 
+                                        React.createElement(LoginForm, {onSubmit: this.attemptLogin, loading: this.state.loading, errors: this.state.errors})
+                                    )
+                                )
+                            )
                         )
                     )
                 )
-            )
         );
     }
 });
@@ -589,7 +787,45 @@ module.exports = function (id, provider) {
     return qwest.post(config.API_URL + 'providers/' + id, provider, {headers:GetHeaders()});
 };
 
-},{"./../../config.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/config.js","./../auth/GetHeaders.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/GetHeaders.js","qwest":"/Users/user/PhpstormProjects/careselector-admin/node_modules/qwest/src/qwest.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/BristolProvidersStore.js":[function(require,module,exports){
+},{"./../../config.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/config.js","./../auth/GetHeaders.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/GetHeaders.js","qwest":"/Users/user/PhpstormProjects/careselector-admin/node_modules/qwest/src/qwest.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/AuthStore.js":[function(require,module,exports){
+var Fluxxor = require('Fluxxor');
+var constants = require('./../constants.js');
+
+module.exports = Fluxxor.createStore({
+    initialize: function () {
+        this.providers = [];
+        this.loading = false;
+        this.errors = [];
+
+        this.bindActions(
+            "ATTEMPT_AUTH", this.attemptAuth,
+            "ATTEMPT_AUTH_SUCCESS", this.attemptAuthSuccess,
+            "ATTEMPT_AUTH_FAIL", this.attemptAuthFail
+        );
+    },
+    attemptAuth: function () {
+        this.loading = true;
+        this.emit("change");
+    },
+    attemptAuthSuccess: function () {
+        this.loading = false;
+        this.errors = [];
+        this.emit("change");
+    },
+    attemptAuthFail: function (errors) {
+        this.errors = errors.auth;
+        this.loading = false;
+        this.emit("change");
+    },
+    isLoading: function () {
+        return this.loading;
+    },
+    getErrors: function () {
+        return this.errors;
+    }
+});
+
+},{"./../constants.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/constants.js","Fluxxor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/stores/BristolProvidersStore.js":[function(require,module,exports){
 var Fluxxor = require('Fluxxor');
 var constants = require('./../constants.js');
 
@@ -599,21 +835,24 @@ module.exports = Fluxxor.createStore({
         this.loading = false;
 
         this.bindActions(
-            "LOAD_BRISTOL_PROVIDERS", this.isLoading,
-            "LOAD_BRISTOL_PROVIDERS_SUCCESS", this.loadProviders
+            "LOAD_BRISTOL_PROVIDERS", this.load,
+            "LOAD_BRISTOL_PROVIDERS_SUCCESS", this.loadSuccess
         );
     },
-    isLoading: function () {
+    load: function () {
         this.loading = true;
         this.emit("change");
     },
-    loadProviders: function (response) {
+    loadSuccess: function (response) {
         this.loading = false;
         this.providers = response.data;
         this.emit("change");
     },
     getProviders: function () {
         return this.providers;
+    },
+    isLoading: function () {
+        return this.loading;
     }
 });
 
@@ -625,10 +864,13 @@ module.exports = Fluxxor.createStore({
     initialize: function () {
         this.provider = {};
         this.loading = false;
+        this.saving = false;
 
         this.bindActions(
             "LOAD_PROVIDER_FOR_EDITING", this.loadProvider,
-            "LOAD_PROVIDER_FOR_EDITING_SUCCESS", this.loadProviderSuccess
+            "LOAD_PROVIDER_FOR_EDITING_SUCCESS", this.loadProviderSuccess,
+            "SAVE_PROVIDER", this.saveProvider,
+            "SAVE_PROVIDER_SUCCESS", this.saveProviderSuccess
         );
     },
     loadProvider: function () {
@@ -641,8 +883,22 @@ module.exports = Fluxxor.createStore({
         this.provider = response.data;
         this.emit("change");
     },
+    saveProvider: function () {
+        this.saving = true;
+        this.emit("change");
+    },
+    saveProviderSuccess: function () {
+        this.saving = false;
+        this.emit("change");
+    },
     getProvider: function () {
         return this.provider;
+    },
+    isLoading: function () {
+        return this.loading;
+    },
+    isSaving: function () {
+        return this.saving;
     }
 });
 
@@ -667,8 +923,8 @@ var Fluxxor = {
 module.exports = Fluxxor;
 
 },{"./lib/create_store":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/create_store.js","./lib/dispatcher":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/dispatcher.js","./lib/flux":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/flux.js","./lib/flux_child_mixin":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/flux_child_mixin.js","./lib/flux_mixin":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/flux_mixin.js","./lib/store_watch_mixin":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/store_watch_mixin.js","./version":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/version.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/create_store.js":[function(require,module,exports){
-var _each = require("lodash-node/modern/collection/forEach"),
-    _isFunction = require("lodash-node/modern/lang/isFunction"),
+var _each = require("lodash/collection/forEach"),
+    _isFunction = require("lodash/lang/isFunction"),
     Store = require("./store"),
     inherits = require("./util/inherits");
 
@@ -708,23 +964,29 @@ var createStore = function(spec) {
 
 module.exports = createStore;
 
-},{"./store":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/store.js","./util/inherits":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/util/inherits.js","lodash-node/modern/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/forEach.js","lodash-node/modern/lang/isFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isFunction.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/dispatcher.js":[function(require,module,exports){
-var _clone = require("lodash-node/modern/lang/clone"),
-    _mapValues = require("lodash-node/modern/object/mapValues"),
-    _forOwn = require("lodash-node/modern/object/forOwn"),
-    _intersection = require("lodash-node/modern/array/intersection"),
-    _keys = require("lodash-node/modern/object/keys"),
-    _map = require("lodash-node/modern/collection/map"),
-    _each = require("lodash-node/modern/collection/forEach"),
-    _size = require("lodash-node/modern/collection/size"),
-    _findKey = require("lodash-node/modern/object/findKey"),
-    _uniq = require("lodash-node/modern/array/uniq");
+},{"./store":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/store.js","./util/inherits":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/util/inherits.js","lodash/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/forEach.js","lodash/lang/isFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isFunction.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/dispatcher.js":[function(require,module,exports){
+var _clone = require("lodash/lang/clone"),
+    _mapValues = require("lodash/object/mapValues"),
+    _forOwn = require("lodash/object/forOwn"),
+    _intersection = require("lodash/array/intersection"),
+    _keys = require("lodash/object/keys"),
+    _map = require("lodash/collection/map"),
+    _each = require("lodash/collection/forEach"),
+    _size = require("lodash/collection/size"),
+    _findKey = require("lodash/object/findKey"),
+    _uniq = require("lodash/array/uniq");
+
+var defaultDispatchInterceptor = function(action, dispatch) {
+  dispatch(action);
+};
 
 var Dispatcher = function(stores) {
   this.stores = {};
   this.currentDispatch = null;
   this.currentActionType = null;
   this.waitingToDispatch = [];
+  this.dispatchInterceptor = defaultDispatchInterceptor;
+  this._boundDispatch = this._dispatch.bind(this);
 
   for (var key in stores) {
     if (stores.hasOwnProperty(key)) {
@@ -739,6 +1001,10 @@ Dispatcher.prototype.addStore = function(name, store) {
 };
 
 Dispatcher.prototype.dispatch = function(action) {
+  this.dispatchInterceptor(action, this._boundDispatch);
+};
+
+Dispatcher.prototype._dispatch = function(action) {
   if (!action || !action.type) {
     throw new Error("Can only dispatch actions with a 'type' property");
   }
@@ -852,16 +1118,24 @@ Dispatcher.prototype.waitForStores = function(store, stores, fn) {
   dispatch.waitCallback = fn;
 };
 
+Dispatcher.prototype.setDispatchInterceptor = function(fn) {
+  if (fn) {
+    this.dispatchInterceptor = fn;
+  } else {
+    this.dispatchInterceptor = defaultDispatchInterceptor;
+  }
+};
+
 module.exports = Dispatcher;
 
-},{"lodash-node/modern/array/intersection":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/array/intersection.js","lodash-node/modern/array/uniq":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/array/uniq.js","lodash-node/modern/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/forEach.js","lodash-node/modern/collection/map":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/map.js","lodash-node/modern/collection/size":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/size.js","lodash-node/modern/lang/clone":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/clone.js","lodash-node/modern/object/findKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/findKey.js","lodash-node/modern/object/forOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/forOwn.js","lodash-node/modern/object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/keys.js","lodash-node/modern/object/mapValues":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/mapValues.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/flux.js":[function(require,module,exports){
+},{"lodash/array/intersection":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/array/intersection.js","lodash/array/uniq":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/array/uniq.js","lodash/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/forEach.js","lodash/collection/map":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/map.js","lodash/collection/size":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/size.js","lodash/lang/clone":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/clone.js","lodash/object/findKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/findKey.js","lodash/object/forOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/forOwn.js","lodash/object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/keys.js","lodash/object/mapValues":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/mapValues.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/flux.js":[function(require,module,exports){
 var EventEmitter = require("eventemitter3"),
     inherits = require("./util/inherits"),
     objectPath = require("object-path"),
-    _each = require("lodash-node/modern/collection/forEach"),
-    _reduce = require("lodash-node/modern/collection/reduce"),
-    _isFunction = require("lodash-node/modern/lang/isFunction"),
-    _isString = require("lodash-node/modern/lang/isString");
+    _each = require("lodash/collection/forEach"),
+    _reduce = require("lodash/collection/reduce"),
+    _isFunction = require("lodash/lang/isFunction"),
+    _isString = require("lodash/lang/isString");
 
 var Dispatcher = require("./dispatcher");
 
@@ -973,9 +1247,13 @@ Flux.prototype.addStores = function(stores) {
   }
 };
 
+Flux.prototype.setDispatchInterceptor = function(fn) {
+  this.dispatcher.setDispatchInterceptor(fn);
+};
+
 module.exports = Flux;
 
-},{"./dispatcher":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/dispatcher.js","./util/inherits":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/util/inherits.js","eventemitter3":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/eventemitter3/index.js","lodash-node/modern/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/forEach.js","lodash-node/modern/collection/reduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/reduce.js","lodash-node/modern/lang/isFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isFunction.js","lodash-node/modern/lang/isString":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isString.js","object-path":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/object-path/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/flux_child_mixin.js":[function(require,module,exports){
+},{"./dispatcher":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/dispatcher.js","./util/inherits":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/util/inherits.js","eventemitter3":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/eventemitter3/index.js","lodash/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/forEach.js","lodash/collection/reduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/reduce.js","lodash/lang/isFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isFunction.js","lodash/lang/isString":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isString.js","object-path":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/object-path/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/flux_child_mixin.js":[function(require,module,exports){
 var FluxChildMixin = function(React) {
   return {
     componentWillMount: function() {
@@ -1044,8 +1322,8 @@ module.exports = FluxMixin;
 },{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/store.js":[function(require,module,exports){
 var EventEmitter = require("eventemitter3"),
     inherits = require("./util/inherits"),
-    _isFunction = require("lodash-node/modern/lang/isFunction"),
-    _isObject = require("lodash-node/modern/lang/isObject");
+    _isFunction = require("lodash/lang/isFunction"),
+    _isObject = require("lodash/lang/isObject");
 
 function Store(dispatcher) {
   this.dispatcher = dispatcher;
@@ -1113,8 +1391,8 @@ Store.prototype.waitFor = function(stores, fn) {
 
 module.exports = Store;
 
-},{"./util/inherits":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/util/inherits.js","eventemitter3":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/eventemitter3/index.js","lodash-node/modern/lang/isFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isFunction.js","lodash-node/modern/lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/store_watch_mixin.js":[function(require,module,exports){
-var _each = require("lodash-node/modern/collection/forEach");
+},{"./util/inherits":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/util/inherits.js","eventemitter3":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/eventemitter3/index.js","lodash/lang/isFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isFunction.js","lodash/lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/store_watch_mixin.js":[function(require,module,exports){
+var _each = require("lodash/collection/forEach");
 
 var StoreWatchMixin = function() {
   var storeNames = Array.prototype.slice.call(arguments);
@@ -1153,7 +1431,7 @@ StoreWatchMixin.componentWillMount = function() {
 
 module.exports = StoreWatchMixin;
 
-},{"lodash-node/modern/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/forEach.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/util/inherits.js":[function(require,module,exports){
+},{"lodash/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/forEach.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/util/inherits.js":[function(require,module,exports){
 // From https://github.com/isaacs/inherits
 // inherits is licensed under the ISC license:
 //
@@ -1429,20 +1707,16 @@ EventEmitter.EventEmitter3 = EventEmitter;
 //
 module.exports = EventEmitter;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/array/intersection.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/array/intersection.js":[function(require,module,exports){
 var baseIndexOf = require('../internal/baseIndexOf'),
     cacheIndexOf = require('../internal/cacheIndexOf'),
     createCache = require('../internal/createCache'),
-    isArguments = require('../lang/isArguments'),
-    isArray = require('../lang/isArray');
+    isArrayLike = require('../internal/isArrayLike');
 
 /**
- * Creates an array of unique values in all provided arrays using `SameValueZero`
+ * Creates an array of unique values in all provided arrays using
+ * [`SameValueZero`](https://people.mozilla.org/~jorendorff/es6-draft.html#sec-samevaluezero)
  * for equality comparisons.
- *
- * **Note:** [`SameValueZero`](https://people.mozilla.org/~jorendorff/es6-draft.html#sec-samevaluezero)
- * comparisons are like strict equality comparisons, e.g. `===`, except that
- * `NaN` matches `NaN`.
  *
  * @static
  * @memberOf _
@@ -1464,7 +1738,7 @@ function intersection() {
 
   while (++argsIndex < argsLength) {
     var value = arguments[argsIndex];
-    if (isArray(value) || isArguments(value)) {
+    if (isArrayLike(value)) {
       args.push(value);
       caches.push((isCommon && value.length >= 120) ? createCache(argsIndex && value) : null);
     }
@@ -1500,7 +1774,7 @@ function intersection() {
 
 module.exports = intersection;
 
-},{"../internal/baseIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIndexOf.js","../internal/cacheIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/cacheIndexOf.js","../internal/createCache":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createCache.js","../lang/isArguments":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArguments.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArray.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/array/last.js":[function(require,module,exports){
+},{"../internal/baseIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIndexOf.js","../internal/cacheIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/cacheIndexOf.js","../internal/createCache":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createCache.js","../internal/isArrayLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isArrayLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/array/last.js":[function(require,module,exports){
 /**
  * Gets the last element of `array`.
  *
@@ -1521,15 +1795,16 @@ function last(array) {
 
 module.exports = last;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/array/uniq.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/array/uniq.js":[function(require,module,exports){
 var baseCallback = require('../internal/baseCallback'),
     baseUniq = require('../internal/baseUniq'),
     isIterateeCall = require('../internal/isIterateeCall'),
     sortedUniq = require('../internal/sortedUniq');
 
 /**
- * Creates a duplicate-free version of an array, using `SameValueZero` for
- * equality comparisons, in which only the first occurence of each element
+ * Creates a duplicate-free version of an array, using
+ * [`SameValueZero`](https://people.mozilla.org/~jorendorff/es6-draft.html#sec-samevaluezero)
+ * for equality comparisons, in which only the first occurence of each element
  * is kept. Providing `true` for `isSorted` performs a faster search algorithm
  * for sorted arrays. If an iteratee function is provided it is invoked for
  * each element in the array to generate the criterion by which uniqueness
@@ -1546,10 +1821,6 @@ var baseCallback = require('../internal/baseCallback'),
  * If an object is provided for `iteratee` the created `_.matches` style
  * callback returns `true` for elements that have the properties of the given
  * object, else `false`.
- *
- * **Note:** [`SameValueZero`](https://people.mozilla.org/~jorendorff/es6-draft.html#sec-samevaluezero)
- * comparisons are like strict equality comparisons, e.g. `===`, except that
- * `NaN` matches `NaN`.
  *
  * @static
  * @memberOf _
@@ -1597,7 +1868,7 @@ function uniq(array, isSorted, iteratee, thisArg) {
 
 module.exports = uniq;
 
-},{"../internal/baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseCallback.js","../internal/baseUniq":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseUniq.js","../internal/isIterateeCall":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isIterateeCall.js","../internal/sortedUniq":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/sortedUniq.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/forEach.js":[function(require,module,exports){
+},{"../internal/baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseCallback.js","../internal/baseUniq":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseUniq.js","../internal/isIterateeCall":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isIterateeCall.js","../internal/sortedUniq":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/sortedUniq.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/forEach.js":[function(require,module,exports){
 var arrayEach = require('../internal/arrayEach'),
     baseEach = require('../internal/baseEach'),
     createForEach = require('../internal/createForEach');
@@ -1636,7 +1907,7 @@ var forEach = createForEach(arrayEach, baseEach);
 
 module.exports = forEach;
 
-},{"../internal/arrayEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/arrayEach.js","../internal/baseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseEach.js","../internal/createForEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createForEach.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/map.js":[function(require,module,exports){
+},{"../internal/arrayEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/arrayEach.js","../internal/baseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseEach.js","../internal/createForEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createForEach.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/map.js":[function(require,module,exports){
 var arrayMap = require('../internal/arrayMap'),
     baseCallback = require('../internal/baseCallback'),
     baseMap = require('../internal/baseMap'),
@@ -1662,10 +1933,11 @@ var arrayMap = require('../internal/arrayMap'),
  * `_.every`, `_.filter`, `_.map`, `_.mapValues`, `_.reject`, and `_.some`.
  *
  * The guarded methods are:
- * `ary`, `callback`, `chunk`, `clone`, `create`, `curry`, `curryRight`, `drop`,
- * `dropRight`, `every`, `fill`, `flatten`, `invert`, `max`, `min`, `parseInt`,
- * `slice`, `sortBy`, `take`, `takeRight`, `template`, `trim`, `trimLeft`,
- * `trimRight`, `trunc`, `random`, `range`, `sample`, `some`, `uniq`, and `words`
+ * `ary`, `callback`, `chunk`, `clone`, `create`, `curry`, `curryRight`,
+ * `drop`, `dropRight`, `every`, `fill`, `flatten`, `invert`, `max`, `min`,
+ * `parseInt`, `slice`, `sortBy`, `take`, `takeRight`, `template`, `trim`,
+ * `trimLeft`, `trimRight`, `trunc`, `random`, `range`, `sample`, `some`,
+ * `sum`, `uniq`, and `words`
  *
  * @static
  * @memberOf _
@@ -1705,7 +1977,7 @@ function map(collection, iteratee, thisArg) {
 
 module.exports = map;
 
-},{"../internal/arrayMap":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/arrayMap.js","../internal/baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseCallback.js","../internal/baseMap":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseMap.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArray.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/reduce.js":[function(require,module,exports){
+},{"../internal/arrayMap":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/arrayMap.js","../internal/baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseCallback.js","../internal/baseMap":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseMap.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArray.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/reduce.js":[function(require,module,exports){
 var arrayReduce = require('../internal/arrayReduce'),
     baseEach = require('../internal/baseEach'),
     createReduce = require('../internal/createReduce');
@@ -1750,7 +2022,7 @@ var reduce = createReduce(arrayReduce, baseEach);
 
 module.exports = reduce;
 
-},{"../internal/arrayReduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/arrayReduce.js","../internal/baseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseEach.js","../internal/createReduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createReduce.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/size.js":[function(require,module,exports){
+},{"../internal/arrayReduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/arrayReduce.js","../internal/baseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseEach.js","../internal/createReduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createReduce.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/size.js":[function(require,module,exports){
 var getLength = require('../internal/getLength'),
     isLength = require('../internal/isLength'),
     keys = require('../object/keys');
@@ -1782,7 +2054,7 @@ function size(collection) {
 
 module.exports = size;
 
-},{"../internal/getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/getLength.js","../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isLength.js","../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/keys.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/SetCache.js":[function(require,module,exports){
+},{"../internal/getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/getLength.js","../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isLength.js","../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/keys.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/SetCache.js":[function(require,module,exports){
 (function (global){
 var cachePush = require('./cachePush'),
     isNative = require('../lang/isNative');
@@ -1815,7 +2087,7 @@ SetCache.prototype.push = cachePush;
 module.exports = SetCache;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isNative.js","./cachePush":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/cachePush.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/arrayCopy.js":[function(require,module,exports){
+},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isNative.js","./cachePush":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/cachePush.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/arrayCopy.js":[function(require,module,exports){
 /**
  * Copies the values of `source` to `array`.
  *
@@ -1837,7 +2109,7 @@ function arrayCopy(source, array) {
 
 module.exports = arrayCopy;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/arrayEach.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/arrayEach.js":[function(require,module,exports){
 /**
  * A specialized version of `_.forEach` for arrays without support for callback
  * shorthands and `this` binding.
@@ -1861,7 +2133,7 @@ function arrayEach(array, iteratee) {
 
 module.exports = arrayEach;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/arrayMap.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/arrayMap.js":[function(require,module,exports){
 /**
  * A specialized version of `_.map` for arrays without support for callback
  * shorthands and `this` binding.
@@ -1884,7 +2156,7 @@ function arrayMap(array, iteratee) {
 
 module.exports = arrayMap;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/arrayReduce.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/arrayReduce.js":[function(require,module,exports){
 /**
  * A specialized version of `_.reduce` for arrays without support for callback
  * shorthands and `this` binding.
@@ -1912,14 +2184,14 @@ function arrayReduce(array, iteratee, accumulator, initFromArray) {
 
 module.exports = arrayReduce;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseAssign.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseAssign.js":[function(require,module,exports){
 var baseCopy = require('./baseCopy'),
     getSymbols = require('./getSymbols'),
     isNative = require('../lang/isNative'),
     keys = require('../object/keys');
 
 /** Native method references. */
-var preventExtensions = isNative(Object.preventExtensions = Object.preventExtensions) && preventExtensions;
+var preventExtensions = isNative(preventExtensions = Object.preventExtensions) && preventExtensions;
 
 /** Used as `baseAssign`. */
 var nativeAssign = (function() {
@@ -1929,12 +2201,19 @@ var nativeAssign = (function() {
   //
   // Use `Object.preventExtensions` on a plain object instead of simply using
   // `Object('x')` because Chrome and IE fail to throw an error when attempting
-  // to assign values to readonly indexes of strings in strict mode.
-  var object = { '1': 0 },
-      func = preventExtensions && isNative(func = Object.assign) && func;
-
-  try { func(preventExtensions(object), 'xo'); } catch(e) {}
-  return !object[1] && func;
+  // to assign values to readonly indexes of strings.
+  var func = preventExtensions && isNative(func = Object.assign) && func;
+  try {
+    if (func) {
+      var object = preventExtensions({ '1': 0 });
+      object[0] = 1;
+    }
+  } catch(e) {
+    // Only attempt in strict mode.
+    try { func(object, 'xo'); } catch(e) {}
+    return !object[1] && func;
+  }
+  return false;
 }());
 
 /**
@@ -1954,7 +2233,7 @@ var baseAssign = nativeAssign || function(object, source) {
 
 module.exports = baseAssign;
 
-},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isNative.js","../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/keys.js","./baseCopy":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseCopy.js","./getSymbols":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/getSymbols.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseCallback.js":[function(require,module,exports){
+},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isNative.js","../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/keys.js","./baseCopy":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseCopy.js","./getSymbols":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/getSymbols.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseCallback.js":[function(require,module,exports){
 var baseMatches = require('./baseMatches'),
     baseMatchesProperty = require('./baseMatchesProperty'),
     bindCallback = require('./bindCallback'),
@@ -1991,7 +2270,7 @@ function baseCallback(func, thisArg, argCount) {
 
 module.exports = baseCallback;
 
-},{"../utility/identity":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/utility/identity.js","../utility/property":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/utility/property.js","./baseMatches":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseMatches.js","./baseMatchesProperty":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseMatchesProperty.js","./bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/bindCallback.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseClone.js":[function(require,module,exports){
+},{"../utility/identity":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/utility/identity.js","../utility/property":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/utility/property.js","./baseMatches":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseMatches.js","./baseMatchesProperty":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseMatchesProperty.js","./bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/bindCallback.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseClone.js":[function(require,module,exports){
 var arrayCopy = require('./arrayCopy'),
     arrayEach = require('./arrayEach'),
     baseAssign = require('./baseAssign'),
@@ -2121,7 +2400,7 @@ function baseClone(value, isDeep, customizer, key, object, stackA, stackB) {
 
 module.exports = baseClone;
 
-},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArray.js","../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isObject.js","./arrayCopy":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/arrayCopy.js","./arrayEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/arrayEach.js","./baseAssign":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseAssign.js","./baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseForOwn.js","./initCloneArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/initCloneArray.js","./initCloneByTag":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/initCloneByTag.js","./initCloneObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/initCloneObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseCopy.js":[function(require,module,exports){
+},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArray.js","../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isObject.js","./arrayCopy":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/arrayCopy.js","./arrayEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/arrayEach.js","./baseAssign":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseAssign.js","./baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseForOwn.js","./initCloneArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/initCloneArray.js","./initCloneByTag":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/initCloneByTag.js","./initCloneObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/initCloneObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseCopy.js":[function(require,module,exports){
 /**
  * Copies properties of `source` to `object`.
  *
@@ -2146,7 +2425,7 @@ function baseCopy(source, props, object) {
 
 module.exports = baseCopy;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseEach.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseEach.js":[function(require,module,exports){
 var baseForOwn = require('./baseForOwn'),
     createBaseEach = require('./createBaseEach');
 
@@ -2163,7 +2442,7 @@ var baseEach = createBaseEach(baseForOwn);
 
 module.exports = baseEach;
 
-},{"./baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseForOwn.js","./createBaseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createBaseEach.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseFind.js":[function(require,module,exports){
+},{"./baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseForOwn.js","./createBaseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createBaseEach.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseFind.js":[function(require,module,exports){
 /**
  * The base implementation of `_.find`, `_.findLast`, `_.findKey`, and `_.findLastKey`,
  * without support for callback shorthands and `this` binding, which iterates
@@ -2190,7 +2469,7 @@ function baseFind(collection, predicate, eachFunc, retKey) {
 
 module.exports = baseFind;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseFor.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseFor.js":[function(require,module,exports){
 var createBaseFor = require('./createBaseFor');
 
 /**
@@ -2209,7 +2488,7 @@ var baseFor = createBaseFor();
 
 module.exports = baseFor;
 
-},{"./createBaseFor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createBaseFor.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseForOwn.js":[function(require,module,exports){
+},{"./createBaseFor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createBaseFor.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseForOwn.js":[function(require,module,exports){
 var baseFor = require('./baseFor'),
     keys = require('../object/keys');
 
@@ -2228,7 +2507,7 @@ function baseForOwn(object, iteratee) {
 
 module.exports = baseForOwn;
 
-},{"../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/keys.js","./baseFor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseFor.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseGet.js":[function(require,module,exports){
+},{"../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/keys.js","./baseFor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseFor.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseGet.js":[function(require,module,exports){
 var toObject = require('./toObject');
 
 /**
@@ -2252,14 +2531,14 @@ function baseGet(object, path, pathKey) {
       length = path.length;
 
   while (object != null && ++index < length) {
-    var result = object = object[path[index]];
+    object = object[path[index]];
   }
-  return result;
+  return (index && index == length) ? object : undefined;
 }
 
 module.exports = baseGet;
 
-},{"./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIndexOf.js":[function(require,module,exports){
+},{"./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIndexOf.js":[function(require,module,exports){
 var indexOfNaN = require('./indexOfNaN');
 
 /**
@@ -2288,7 +2567,7 @@ function baseIndexOf(array, value, fromIndex) {
 
 module.exports = baseIndexOf;
 
-},{"./indexOfNaN":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/indexOfNaN.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIsEqual.js":[function(require,module,exports){
+},{"./indexOfNaN":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/indexOfNaN.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIsEqual.js":[function(require,module,exports){
 var baseIsEqualDeep = require('./baseIsEqualDeep');
 
 /**
@@ -2307,8 +2586,7 @@ var baseIsEqualDeep = require('./baseIsEqualDeep');
 function baseIsEqual(value, other, customizer, isLoose, stackA, stackB) {
   // Exit early for identical values.
   if (value === other) {
-    // Treat `+0` vs. `-0` as not equal.
-    return value !== 0 || (1 / value == 1 / other);
+    return true;
   }
   var valType = typeof value,
       othType = typeof other;
@@ -2324,7 +2602,7 @@ function baseIsEqual(value, other, customizer, isLoose, stackA, stackB) {
 
 module.exports = baseIsEqual;
 
-},{"./baseIsEqualDeep":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIsEqualDeep.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIsEqualDeep.js":[function(require,module,exports){
+},{"./baseIsEqualDeep":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIsEqualDeep.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIsEqualDeep.js":[function(require,module,exports){
 var equalArrays = require('./equalArrays'),
     equalByTag = require('./equalByTag'),
     equalObjects = require('./equalObjects'),
@@ -2428,7 +2706,7 @@ function baseIsEqualDeep(object, other, equalFunc, customizer, isLoose, stackA, 
 
 module.exports = baseIsEqualDeep;
 
-},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArray.js","../lang/isTypedArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isTypedArray.js","./equalArrays":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/equalArrays.js","./equalByTag":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/equalByTag.js","./equalObjects":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/equalObjects.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIsFunction.js":[function(require,module,exports){
+},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArray.js","../lang/isTypedArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isTypedArray.js","./equalArrays":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/equalArrays.js","./equalByTag":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/equalByTag.js","./equalObjects":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/equalObjects.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIsFunction.js":[function(require,module,exports){
 /**
  * The base implementation of `_.isFunction` without support for environments
  * with incorrect `typeof` results.
@@ -2445,7 +2723,7 @@ function baseIsFunction(value) {
 
 module.exports = baseIsFunction;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIsMatch.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIsMatch.js":[function(require,module,exports){
 var baseIsEqual = require('./baseIsEqual');
 
 /**
@@ -2496,10 +2774,9 @@ function baseIsMatch(object, props, values, strictCompareFlags, customizer) {
 
 module.exports = baseIsMatch;
 
-},{"./baseIsEqual":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIsEqual.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseMap.js":[function(require,module,exports){
+},{"./baseIsEqual":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIsEqual.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseMap.js":[function(require,module,exports){
 var baseEach = require('./baseEach'),
-    getLength = require('./getLength'),
-    isLength = require('./isLength');
+    isArrayLike = require('./isArrayLike');
 
 /**
  * The base implementation of `_.map` without support for callback shorthands
@@ -2512,8 +2789,7 @@ var baseEach = require('./baseEach'),
  */
 function baseMap(collection, iteratee) {
   var index = -1,
-      length = getLength(collection),
-      result = isLength(length) ? Array(length) : [];
+      result = isArrayLike(collection) ? Array(collection.length) : [];
 
   baseEach(collection, function(value, key, collection) {
     result[++index] = iteratee(value, key, collection);
@@ -2523,7 +2799,7 @@ function baseMap(collection, iteratee) {
 
 module.exports = baseMap;
 
-},{"./baseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseEach.js","./getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/getLength.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isLength.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseMatches.js":[function(require,module,exports){
+},{"./baseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseEach.js","./isArrayLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isArrayLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseMatches.js":[function(require,module,exports){
 var baseIsMatch = require('./baseIsMatch'),
     constant = require('../utility/constant'),
     isStrictComparable = require('./isStrictComparable'),
@@ -2572,7 +2848,7 @@ function baseMatches(source) {
 
 module.exports = baseMatches;
 
-},{"../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/keys.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/utility/constant.js","./baseIsMatch":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIsMatch.js","./isStrictComparable":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isStrictComparable.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseMatchesProperty.js":[function(require,module,exports){
+},{"../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/keys.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/utility/constant.js","./baseIsMatch":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIsMatch.js","./isStrictComparable":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isStrictComparable.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseMatchesProperty.js":[function(require,module,exports){
 var baseGet = require('./baseGet'),
     baseIsEqual = require('./baseIsEqual'),
     baseSlice = require('./baseSlice'),
@@ -2620,7 +2896,7 @@ function baseMatchesProperty(path, value) {
 
 module.exports = baseMatchesProperty;
 
-},{"../array/last":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/array/last.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArray.js","./baseGet":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseGet.js","./baseIsEqual":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIsEqual.js","./baseSlice":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseSlice.js","./isKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isKey.js","./isStrictComparable":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isStrictComparable.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/toObject.js","./toPath":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/toPath.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseProperty.js":[function(require,module,exports){
+},{"../array/last":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/array/last.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArray.js","./baseGet":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseGet.js","./baseIsEqual":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIsEqual.js","./baseSlice":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseSlice.js","./isKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isKey.js","./isStrictComparable":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isStrictComparable.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/toObject.js","./toPath":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/toPath.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseProperty.js":[function(require,module,exports){
 /**
  * The base implementation of `_.property` without support for deep paths.
  *
@@ -2636,7 +2912,7 @@ function baseProperty(key) {
 
 module.exports = baseProperty;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/basePropertyDeep.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/basePropertyDeep.js":[function(require,module,exports){
 var baseGet = require('./baseGet'),
     toPath = require('./toPath');
 
@@ -2657,7 +2933,7 @@ function basePropertyDeep(path) {
 
 module.exports = basePropertyDeep;
 
-},{"./baseGet":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseGet.js","./toPath":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/toPath.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseReduce.js":[function(require,module,exports){
+},{"./baseGet":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseGet.js","./toPath":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/toPath.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseReduce.js":[function(require,module,exports){
 /**
  * The base implementation of `_.reduce` and `_.reduceRight` without support
  * for callback shorthands and `this` binding, which iterates over `collection`
@@ -2683,7 +2959,7 @@ function baseReduce(collection, iteratee, accumulator, initFromCollection, eachF
 
 module.exports = baseReduce;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseSlice.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseSlice.js":[function(require,module,exports){
 /**
  * The base implementation of `_.slice` without an iteratee call guard.
  *
@@ -2717,7 +2993,7 @@ function baseSlice(array, start, end) {
 
 module.exports = baseSlice;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseToString.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseToString.js":[function(require,module,exports){
 /**
  * Converts `value` to a string if it is not one. An empty string is returned
  * for `null` or `undefined` values.
@@ -2735,7 +3011,7 @@ function baseToString(value) {
 
 module.exports = baseToString;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseUniq.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseUniq.js":[function(require,module,exports){
 var baseIndexOf = require('./baseIndexOf'),
     cacheIndexOf = require('./cacheIndexOf'),
     createCache = require('./createCache');
@@ -2794,7 +3070,7 @@ function baseUniq(array, iteratee) {
 
 module.exports = baseUniq;
 
-},{"./baseIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIndexOf.js","./cacheIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/cacheIndexOf.js","./createCache":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createCache.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/bindCallback.js":[function(require,module,exports){
+},{"./baseIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIndexOf.js","./cacheIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/cacheIndexOf.js","./createCache":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createCache.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/bindCallback.js":[function(require,module,exports){
 var identity = require('../utility/identity');
 
 /**
@@ -2835,7 +3111,7 @@ function bindCallback(func, thisArg, argCount) {
 
 module.exports = bindCallback;
 
-},{"../utility/identity":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/utility/identity.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/bufferClone.js":[function(require,module,exports){
+},{"../utility/identity":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/utility/identity.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/bufferClone.js":[function(require,module,exports){
 (function (global){
 var constant = require('../utility/constant'),
     isNative = require('../lang/isNative');
@@ -2894,7 +3170,7 @@ if (!bufferSlice) {
 module.exports = bufferClone;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isNative.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/utility/constant.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/cacheIndexOf.js":[function(require,module,exports){
+},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isNative.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/utility/constant.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/cacheIndexOf.js":[function(require,module,exports){
 var isObject = require('../lang/isObject');
 
 /**
@@ -2915,7 +3191,7 @@ function cacheIndexOf(cache, value) {
 
 module.exports = cacheIndexOf;
 
-},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/cachePush.js":[function(require,module,exports){
+},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/cachePush.js":[function(require,module,exports){
 var isObject = require('../lang/isObject');
 
 /**
@@ -2937,7 +3213,7 @@ function cachePush(value) {
 
 module.exports = cachePush;
 
-},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createBaseEach.js":[function(require,module,exports){
+},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createBaseEach.js":[function(require,module,exports){
 var getLength = require('./getLength'),
     isLength = require('./isLength'),
     toObject = require('./toObject');
@@ -2970,7 +3246,7 @@ function createBaseEach(eachFunc, fromRight) {
 
 module.exports = createBaseEach;
 
-},{"./getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/getLength.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isLength.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createBaseFor.js":[function(require,module,exports){
+},{"./getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/getLength.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isLength.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createBaseFor.js":[function(require,module,exports){
 var toObject = require('./toObject');
 
 /**
@@ -2999,7 +3275,7 @@ function createBaseFor(fromRight) {
 
 module.exports = createBaseFor;
 
-},{"./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createCache.js":[function(require,module,exports){
+},{"./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createCache.js":[function(require,module,exports){
 (function (global){
 var SetCache = require('./SetCache'),
     constant = require('../utility/constant'),
@@ -3025,7 +3301,7 @@ var createCache = !(nativeCreate && Set) ? constant(null) : function(values) {
 module.exports = createCache;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isNative.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/utility/constant.js","./SetCache":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/SetCache.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createFindKey.js":[function(require,module,exports){
+},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isNative.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/utility/constant.js","./SetCache":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/SetCache.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createFindKey.js":[function(require,module,exports){
 var baseCallback = require('./baseCallback'),
     baseFind = require('./baseFind');
 
@@ -3045,7 +3321,7 @@ function createFindKey(objectFunc) {
 
 module.exports = createFindKey;
 
-},{"./baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseCallback.js","./baseFind":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseFind.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createForEach.js":[function(require,module,exports){
+},{"./baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseCallback.js","./baseFind":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseFind.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createForEach.js":[function(require,module,exports){
 var bindCallback = require('./bindCallback'),
     isArray = require('../lang/isArray');
 
@@ -3067,7 +3343,7 @@ function createForEach(arrayFunc, eachFunc) {
 
 module.exports = createForEach;
 
-},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArray.js","./bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/bindCallback.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createForOwn.js":[function(require,module,exports){
+},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArray.js","./bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/bindCallback.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createForOwn.js":[function(require,module,exports){
 var bindCallback = require('./bindCallback');
 
 /**
@@ -3088,7 +3364,35 @@ function createForOwn(objectFunc) {
 
 module.exports = createForOwn;
 
-},{"./bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/bindCallback.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createReduce.js":[function(require,module,exports){
+},{"./bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/bindCallback.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createObjectMapper.js":[function(require,module,exports){
+var baseCallback = require('./baseCallback'),
+    baseForOwn = require('./baseForOwn');
+
+/**
+ * Creates a function for `_.mapKeys` or `_.mapValues`.
+ *
+ * @private
+ * @param {boolean} [isMapKeys] Specify mapping keys instead of values.
+ * @returns {Function} Returns the new map function.
+ */
+function createObjectMapper(isMapKeys) {
+  return function(object, iteratee, thisArg) {
+    var result = {};
+    iteratee = baseCallback(iteratee, thisArg, 3);
+
+    baseForOwn(object, function(value, key, object) {
+      var mapped = iteratee(value, key, object);
+      key = isMapKeys ? mapped : key;
+      value = isMapKeys ? value : mapped;
+      result[key] = value;
+    });
+    return result;
+  };
+}
+
+module.exports = createObjectMapper;
+
+},{"./baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseCallback.js","./baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseForOwn.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createReduce.js":[function(require,module,exports){
 var baseCallback = require('./baseCallback'),
     baseReduce = require('./baseReduce'),
     isArray = require('../lang/isArray');
@@ -3112,7 +3416,7 @@ function createReduce(arrayFunc, eachFunc) {
 
 module.exports = createReduce;
 
-},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArray.js","./baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseCallback.js","./baseReduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseReduce.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/equalArrays.js":[function(require,module,exports){
+},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArray.js","./baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseCallback.js","./baseReduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseReduce.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/equalArrays.js":[function(require,module,exports){
 /**
  * A specialized version of `baseIsEqualDeep` for arrays with support for
  * partial deep comparisons.
@@ -3168,7 +3472,7 @@ function equalArrays(array, other, equalFunc, customizer, isLoose, stackA, stack
 
 module.exports = equalArrays;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/equalByTag.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/equalByTag.js":[function(require,module,exports){
 /** `Object#toString` result references. */
 var boolTag = '[object Boolean]',
     dateTag = '[object Date]',
@@ -3205,8 +3509,7 @@ function equalByTag(object, other, tag) {
       // Treat `NaN` vs. `NaN` as equal.
       return (object != +object)
         ? other != +other
-        // But, treat `-0` vs. `+0` as not equal.
-        : (object == 0 ? ((1 / object) == (1 / other)) : object == +other);
+        : object == +other;
 
     case regexpTag:
     case stringTag:
@@ -3219,7 +3522,7 @@ function equalByTag(object, other, tag) {
 
 module.exports = equalByTag;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/equalObjects.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/equalObjects.js":[function(require,module,exports){
 var keys = require('../object/keys');
 
 /** Used for native method references. */
@@ -3295,14 +3598,14 @@ function equalObjects(object, other, equalFunc, customizer, isLoose, stackA, sta
 
 module.exports = equalObjects;
 
-},{"../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/keys.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/getLength.js":[function(require,module,exports){
+},{"../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/keys.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/getLength.js":[function(require,module,exports){
 var baseProperty = require('./baseProperty');
 
 /**
  * Gets the "length" property value of `object`.
  *
  * **Note:** This function is used to avoid a [JIT bug](https://bugs.webkit.org/show_bug.cgi?id=142792)
- * in Safari on iOS 8.1 ARM64.
+ * that affects Safari on at least iOS 8.1-8.3 ARM64.
  *
  * @private
  * @param {Object} object The object to query.
@@ -3312,7 +3615,7 @@ var getLength = baseProperty('length');
 
 module.exports = getLength;
 
-},{"./baseProperty":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseProperty.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/getSymbols.js":[function(require,module,exports){
+},{"./baseProperty":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseProperty.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/getSymbols.js":[function(require,module,exports){
 var constant = require('../utility/constant'),
     isNative = require('../lang/isNative'),
     toObject = require('./toObject');
@@ -3333,7 +3636,7 @@ var getSymbols = !getOwnPropertySymbols ? constant([]) : function(object) {
 
 module.exports = getSymbols;
 
-},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isNative.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/utility/constant.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/indexOfNaN.js":[function(require,module,exports){
+},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isNative.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/utility/constant.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/indexOfNaN.js":[function(require,module,exports){
 /**
  * Gets the index at which the first occurrence of `NaN` is found in `array`.
  *
@@ -3358,7 +3661,7 @@ function indexOfNaN(array, fromIndex, fromRight) {
 
 module.exports = indexOfNaN;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/initCloneArray.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/initCloneArray.js":[function(require,module,exports){
 /** Used for native method references. */
 var objectProto = Object.prototype;
 
@@ -3386,7 +3689,7 @@ function initCloneArray(array) {
 
 module.exports = initCloneArray;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/initCloneByTag.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/initCloneByTag.js":[function(require,module,exports){
 var bufferClone = require('./bufferClone');
 
 /** `Object#toString` result references. */
@@ -3451,7 +3754,7 @@ function initCloneByTag(object, tag, isDeep) {
 
 module.exports = initCloneByTag;
 
-},{"./bufferClone":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/bufferClone.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/initCloneObject.js":[function(require,module,exports){
+},{"./bufferClone":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/bufferClone.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/initCloneObject.js":[function(require,module,exports){
 /**
  * Initializes an object clone.
  *
@@ -3469,7 +3772,24 @@ function initCloneObject(object) {
 
 module.exports = initCloneObject;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isIndex.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isArrayLike.js":[function(require,module,exports){
+var getLength = require('./getLength'),
+    isLength = require('./isLength');
+
+/**
+ * Checks if `value` is array-like.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is array-like, else `false`.
+ */
+function isArrayLike(value) {
+  return value != null && isLength(getLength(value));
+}
+
+module.exports = isArrayLike;
+
+},{"./getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/getLength.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isLength.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isIndex.js":[function(require,module,exports){
 /**
  * Used as the [maximum length](https://people.mozilla.org/~jorendorff/es6-draft.html#sec-number.max_safe_integer)
  * of an array-like value.
@@ -3492,10 +3812,9 @@ function isIndex(value, length) {
 
 module.exports = isIndex;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isIterateeCall.js":[function(require,module,exports){
-var getLength = require('./getLength'),
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isIterateeCall.js":[function(require,module,exports){
+var isArrayLike = require('./isArrayLike'),
     isIndex = require('./isIndex'),
-    isLength = require('./isLength'),
     isObject = require('../lang/isObject');
 
 /**
@@ -3512,13 +3831,9 @@ function isIterateeCall(value, index, object) {
     return false;
   }
   var type = typeof index;
-  if (type == 'number') {
-    var length = getLength(object),
-        prereq = isLength(length) && isIndex(index, length);
-  } else {
-    prereq = type == 'string' && index in object;
-  }
-  if (prereq) {
+  if (type == 'number'
+      ? (isArrayLike(object) && isIndex(index, object.length))
+      : (type == 'string' && index in object)) {
     var other = object[index];
     return value === value ? (value === other) : (other !== other);
   }
@@ -3527,12 +3842,12 @@ function isIterateeCall(value, index, object) {
 
 module.exports = isIterateeCall;
 
-},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isObject.js","./getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/getLength.js","./isIndex":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isIndex.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isLength.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isKey.js":[function(require,module,exports){
+},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isObject.js","./isArrayLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isArrayLike.js","./isIndex":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isIndex.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isKey.js":[function(require,module,exports){
 var isArray = require('../lang/isArray'),
     toObject = require('./toObject');
 
 /** Used to match property names within property paths. */
-var reIsDeepProp = /\.|\[(?:[^[\]]+|(["'])(?:(?!\1)[^\n\\]|\\.)*?)\1\]/,
+var reIsDeepProp = /\.|\[(?:[^[\]]*|(["'])(?:(?!\1)[^\n\\]|\\.)*?\1)\]/,
     reIsPlainProp = /^\w*$/;
 
 /**
@@ -3557,7 +3872,7 @@ function isKey(value, object) {
 
 module.exports = isKey;
 
-},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArray.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isLength.js":[function(require,module,exports){
+},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArray.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isLength.js":[function(require,module,exports){
 /**
  * Used as the [maximum length](https://people.mozilla.org/~jorendorff/es6-draft.html#sec-number.max_safe_integer)
  * of an array-like value.
@@ -3579,7 +3894,7 @@ function isLength(value) {
 
 module.exports = isLength;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isObjectLike.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isObjectLike.js":[function(require,module,exports){
 /**
  * Checks if `value` is object-like.
  *
@@ -3593,7 +3908,7 @@ function isObjectLike(value) {
 
 module.exports = isObjectLike;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isStrictComparable.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isStrictComparable.js":[function(require,module,exports){
 var isObject = require('../lang/isObject');
 
 /**
@@ -3605,12 +3920,12 @@ var isObject = require('../lang/isObject');
  *  equality comparisons, else `false`.
  */
 function isStrictComparable(value) {
-  return value === value && (value === 0 ? ((1 / value) > 0) : !isObject(value));
+  return value === value && !isObject(value);
 }
 
 module.exports = isStrictComparable;
 
-},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/shimKeys.js":[function(require,module,exports){
+},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/shimKeys.js":[function(require,module,exports){
 var isArguments = require('../lang/isArguments'),
     isArray = require('../lang/isArray'),
     isIndex = require('./isIndex'),
@@ -3654,7 +3969,7 @@ function shimKeys(object) {
 
 module.exports = shimKeys;
 
-},{"../lang/isArguments":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArguments.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArray.js","../object/keysIn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/keysIn.js","../support":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/support.js","./isIndex":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isIndex.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isLength.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/sortedUniq.js":[function(require,module,exports){
+},{"../lang/isArguments":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArguments.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArray.js","../object/keysIn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/keysIn.js","../support":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/support.js","./isIndex":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isIndex.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isLength.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/sortedUniq.js":[function(require,module,exports){
 /**
  * An implementation of `_.uniq` optimized for sorted arrays without support
  * for callback shorthands and `this` binding.
@@ -3685,7 +4000,7 @@ function sortedUniq(array, iteratee) {
 
 module.exports = sortedUniq;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/toObject.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/toObject.js":[function(require,module,exports){
 var isObject = require('../lang/isObject');
 
 /**
@@ -3701,7 +4016,7 @@ function toObject(value) {
 
 module.exports = toObject;
 
-},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/toPath.js":[function(require,module,exports){
+},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/toPath.js":[function(require,module,exports){
 var baseToString = require('./baseToString'),
     isArray = require('../lang/isArray');
 
@@ -3731,7 +4046,7 @@ function toPath(value) {
 
 module.exports = toPath;
 
-},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArray.js","./baseToString":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseToString.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/clone.js":[function(require,module,exports){
+},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArray.js","./baseToString":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseToString.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/clone.js":[function(require,module,exports){
 var baseClone = require('../internal/baseClone'),
     bindCallback = require('../internal/bindCallback'),
     isIterateeCall = require('../internal/isIterateeCall');
@@ -3802,8 +4117,8 @@ function clone(value, isDeep, customizer, thisArg) {
 
 module.exports = clone;
 
-},{"../internal/baseClone":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseClone.js","../internal/bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/bindCallback.js","../internal/isIterateeCall":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isIterateeCall.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArguments.js":[function(require,module,exports){
-var isLength = require('../internal/isLength'),
+},{"../internal/baseClone":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseClone.js","../internal/bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/bindCallback.js","../internal/isIterateeCall":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isIterateeCall.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArguments.js":[function(require,module,exports){
+var isArrayLike = require('../internal/isArrayLike'),
     isObjectLike = require('../internal/isObjectLike');
 
 /** `Object#toString` result references. */
@@ -3835,13 +4150,12 @@ var objToString = objectProto.toString;
  * // => false
  */
 function isArguments(value) {
-  var length = isObjectLike(value) ? value.length : undefined;
-  return isLength(length) && objToString.call(value) == argsTag;
+  return isObjectLike(value) && isArrayLike(value) && objToString.call(value) == argsTag;
 }
 
 module.exports = isArguments;
 
-},{"../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isLength.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArray.js":[function(require,module,exports){
+},{"../internal/isArrayLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isArrayLike.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArray.js":[function(require,module,exports){
 var isLength = require('../internal/isLength'),
     isNative = require('./isNative'),
     isObjectLike = require('../internal/isObjectLike');
@@ -3883,7 +4197,7 @@ var isArray = nativeIsArray || function(value) {
 
 module.exports = isArray;
 
-},{"../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isLength.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isObjectLike.js","./isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isNative.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isFunction.js":[function(require,module,exports){
+},{"../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isLength.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isObjectLike.js","./isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isNative.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isFunction.js":[function(require,module,exports){
 (function (global){
 var baseIsFunction = require('../internal/baseIsFunction'),
     isNative = require('./isNative');
@@ -3929,7 +4243,7 @@ var isFunction = !(baseIsFunction(/x/) || (Uint8Array && !baseIsFunction(Uint8Ar
 module.exports = isFunction;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../internal/baseIsFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIsFunction.js","./isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isNative.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isNative.js":[function(require,module,exports){
+},{"../internal/baseIsFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIsFunction.js","./isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isNative.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isNative.js":[function(require,module,exports){
 var escapeRegExp = require('../string/escapeRegExp'),
     isObjectLike = require('../internal/isObjectLike');
 
@@ -3985,7 +4299,7 @@ function isNative(value) {
 
 module.exports = isNative;
 
-},{"../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isObjectLike.js","../string/escapeRegExp":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/string/escapeRegExp.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isObject.js":[function(require,module,exports){
+},{"../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isObjectLike.js","../string/escapeRegExp":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/string/escapeRegExp.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isObject.js":[function(require,module,exports){
 /**
  * Checks if `value` is the [language type](https://es5.github.io/#x8) of `Object`.
  * (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
@@ -4015,7 +4329,7 @@ function isObject(value) {
 
 module.exports = isObject;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isString.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isString.js":[function(require,module,exports){
 var isObjectLike = require('../internal/isObjectLike');
 
 /** `Object#toString` result references. */
@@ -4052,7 +4366,7 @@ function isString(value) {
 
 module.exports = isString;
 
-},{"../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isTypedArray.js":[function(require,module,exports){
+},{"../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isTypedArray.js":[function(require,module,exports){
 var isLength = require('../internal/isLength'),
     isObjectLike = require('../internal/isObjectLike');
 
@@ -4128,7 +4442,7 @@ function isTypedArray(value) {
 
 module.exports = isTypedArray;
 
-},{"../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isLength.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/findKey.js":[function(require,module,exports){
+},{"../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isLength.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/findKey.js":[function(require,module,exports){
 var baseForOwn = require('../internal/baseForOwn'),
     createFindKey = require('../internal/createFindKey');
 
@@ -4184,7 +4498,7 @@ var findKey = createFindKey(baseForOwn);
 
 module.exports = findKey;
 
-},{"../internal/baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseForOwn.js","../internal/createFindKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createFindKey.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/forOwn.js":[function(require,module,exports){
+},{"../internal/baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseForOwn.js","../internal/createFindKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createFindKey.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/forOwn.js":[function(require,module,exports){
 var baseForOwn = require('../internal/baseForOwn'),
     createForOwn = require('../internal/createForOwn');
 
@@ -4219,8 +4533,8 @@ var forOwn = createForOwn(baseForOwn);
 
 module.exports = forOwn;
 
-},{"../internal/baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseForOwn.js","../internal/createForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createForOwn.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/keys.js":[function(require,module,exports){
-var isLength = require('../internal/isLength'),
+},{"../internal/baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseForOwn.js","../internal/createForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createForOwn.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/keys.js":[function(require,module,exports){
+var isArrayLike = require('../internal/isArrayLike'),
     isNative = require('../lang/isNative'),
     isObject = require('../lang/isObject'),
     shimKeys = require('../internal/shimKeys');
@@ -4256,12 +4570,9 @@ var nativeKeys = isNative(nativeKeys = Object.keys) && nativeKeys;
  * // => ['0', '1']
  */
 var keys = !nativeKeys ? shimKeys : function(object) {
-  if (object) {
-    var Ctor = object.constructor,
-        length = object.length;
-  }
+  var Ctor = object != null && object.constructor;
   if ((typeof Ctor == 'function' && Ctor.prototype === object) ||
-      (typeof object != 'function' && isLength(length))) {
+      (typeof object != 'function' && isArrayLike(object))) {
     return shimKeys(object);
   }
   return isObject(object) ? nativeKeys(object) : [];
@@ -4269,7 +4580,7 @@ var keys = !nativeKeys ? shimKeys : function(object) {
 
 module.exports = keys;
 
-},{"../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isLength.js","../internal/shimKeys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/shimKeys.js","../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isNative.js","../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/keysIn.js":[function(require,module,exports){
+},{"../internal/isArrayLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isArrayLike.js","../internal/shimKeys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/shimKeys.js","../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isNative.js","../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/keysIn.js":[function(require,module,exports){
 var isArguments = require('../lang/isArguments'),
     isArray = require('../lang/isArray'),
     isIndex = require('../internal/isIndex'),
@@ -4336,9 +4647,8 @@ function keysIn(object) {
 
 module.exports = keysIn;
 
-},{"../internal/isIndex":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isIndex.js","../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isLength.js","../lang/isArguments":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArguments.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArray.js","../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isObject.js","../support":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/support.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/mapValues.js":[function(require,module,exports){
-var baseCallback = require('../internal/baseCallback'),
-    baseForOwn = require('../internal/baseForOwn');
+},{"../internal/isIndex":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isIndex.js","../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isLength.js","../lang/isArguments":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArguments.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArray.js","../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isObject.js","../support":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/support.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/mapValues.js":[function(require,module,exports){
+var createObjectMapper = require('../internal/createObjectMapper');
 
 /**
  * Creates an object with the same keys as `object` and values generated by
@@ -4381,19 +4691,11 @@ var baseCallback = require('../internal/baseCallback'),
  * _.mapValues(users, 'age');
  * // => { 'fred': 40, 'pebbles': 1 } (iteration order is not guaranteed)
  */
-function mapValues(object, iteratee, thisArg) {
-  var result = {};
-  iteratee = baseCallback(iteratee, thisArg, 3);
-
-  baseForOwn(object, function(value, key, object) {
-    result[key] = iteratee(value, key, object);
-  });
-  return result;
-}
+var mapValues = createObjectMapper();
 
 module.exports = mapValues;
 
-},{"../internal/baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseCallback.js","../internal/baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseForOwn.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/string/escapeRegExp.js":[function(require,module,exports){
+},{"../internal/createObjectMapper":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createObjectMapper.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/string/escapeRegExp.js":[function(require,module,exports){
 var baseToString = require('../internal/baseToString');
 
 /**
@@ -4427,7 +4729,7 @@ function escapeRegExp(string) {
 
 module.exports = escapeRegExp;
 
-},{"../internal/baseToString":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseToString.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/support.js":[function(require,module,exports){
+},{"../internal/baseToString":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseToString.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/support.js":[function(require,module,exports){
 (function (global){
 /** Used for native method references. */
 var objectProto = Object.prototype;
@@ -4449,6 +4751,7 @@ var support = {};
 
 (function(x) {
   var Ctor = function() { this.x = x; },
+      args = arguments,
       object = { '0': x, 'length': x },
       props = [];
 
@@ -4498,7 +4801,7 @@ var support = {};
    * @type boolean
    */
   try {
-    support.nonEnumArgs = !propertyIsEnumerable.call(arguments, 1);
+    support.nonEnumArgs = !propertyIsEnumerable.call(args, 1);
   } catch(e) {
     support.nonEnumArgs = true;
   }
@@ -4507,7 +4810,7 @@ var support = {};
 module.exports = support;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/utility/constant.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/utility/constant.js":[function(require,module,exports){
 /**
  * Creates a function that returns `value`.
  *
@@ -4532,7 +4835,7 @@ function constant(value) {
 
 module.exports = constant;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/utility/identity.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/utility/identity.js":[function(require,module,exports){
 /**
  * This method returns the first argument provided to it.
  *
@@ -4554,7 +4857,7 @@ function identity(value) {
 
 module.exports = identity;
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/utility/property.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/utility/property.js":[function(require,module,exports){
 var baseProperty = require('../internal/baseProperty'),
     basePropertyDeep = require('../internal/basePropertyDeep'),
     isKey = require('../internal/isKey');
@@ -4587,7 +4890,7 @@ function property(path) {
 
 module.exports = property;
 
-},{"../internal/baseProperty":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseProperty.js","../internal/basePropertyDeep":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/basePropertyDeep.js","../internal/isKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isKey.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/object-path/index.js":[function(require,module,exports){
+},{"../internal/baseProperty":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseProperty.js","../internal/basePropertyDeep":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/basePropertyDeep.js","../internal/isKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isKey.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/object-path/index.js":[function(require,module,exports){
 (function (root, factory){
   'use strict';
 
@@ -4830,7 +5133,7 @@ module.exports = property;
   return objectPath;
 });
 },{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/version.js":[function(require,module,exports){
-module.exports = "1.5.3"
+module.exports = "1.6.0"
 },{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/browserify/node_modules/process/browser.js":[function(require,module,exports){
 // shim for using process in browser
 
@@ -4895,189 +5198,193 @@ process.umask = function() { return 0; };
 arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/index.js"][0].apply(exports,arguments)
 },{"./lib/create_store":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/create_store.js","./lib/dispatcher":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/dispatcher.js","./lib/flux":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/flux.js","./lib/flux_child_mixin":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/flux_child_mixin.js","./lib/flux_mixin":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/flux_mixin.js","./lib/store_watch_mixin":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/store_watch_mixin.js","./version":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/version.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/create_store.js":[function(require,module,exports){
 arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/create_store.js"][0].apply(exports,arguments)
-},{"./store":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/store.js","./util/inherits":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/util/inherits.js","lodash-node/modern/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/collection/forEach.js","lodash-node/modern/lang/isFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isFunction.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/dispatcher.js":[function(require,module,exports){
+},{"./store":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/store.js","./util/inherits":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/util/inherits.js","lodash/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/collection/forEach.js","lodash/lang/isFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isFunction.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/dispatcher.js":[function(require,module,exports){
 arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/dispatcher.js"][0].apply(exports,arguments)
-},{"lodash-node/modern/array/intersection":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/array/intersection.js","lodash-node/modern/array/uniq":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/array/uniq.js","lodash-node/modern/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/collection/forEach.js","lodash-node/modern/collection/map":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/collection/map.js","lodash-node/modern/collection/size":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/collection/size.js","lodash-node/modern/lang/clone":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/clone.js","lodash-node/modern/object/findKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/findKey.js","lodash-node/modern/object/forOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/forOwn.js","lodash-node/modern/object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/keys.js","lodash-node/modern/object/mapValues":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/mapValues.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/flux.js":[function(require,module,exports){
+},{"lodash/array/intersection":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/array/intersection.js","lodash/array/uniq":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/array/uniq.js","lodash/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/collection/forEach.js","lodash/collection/map":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/collection/map.js","lodash/collection/size":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/collection/size.js","lodash/lang/clone":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/clone.js","lodash/object/findKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/findKey.js","lodash/object/forOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/forOwn.js","lodash/object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/keys.js","lodash/object/mapValues":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/mapValues.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/flux.js":[function(require,module,exports){
 arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/flux.js"][0].apply(exports,arguments)
-},{"./dispatcher":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/dispatcher.js","./util/inherits":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/util/inherits.js","eventemitter3":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/eventemitter3/index.js","lodash-node/modern/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/collection/forEach.js","lodash-node/modern/collection/reduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/collection/reduce.js","lodash-node/modern/lang/isFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isFunction.js","lodash-node/modern/lang/isString":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isString.js","object-path":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/object-path/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/flux_child_mixin.js":[function(require,module,exports){
+},{"./dispatcher":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/dispatcher.js","./util/inherits":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/util/inherits.js","eventemitter3":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/eventemitter3/index.js","lodash/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/collection/forEach.js","lodash/collection/reduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/collection/reduce.js","lodash/lang/isFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isFunction.js","lodash/lang/isString":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isString.js","object-path":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/object-path/index.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/flux_child_mixin.js":[function(require,module,exports){
 arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/flux_child_mixin.js"][0].apply(exports,arguments)
 },{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/flux_mixin.js":[function(require,module,exports){
 arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/flux_mixin.js"][0].apply(exports,arguments)
 },{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/store.js":[function(require,module,exports){
 arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/store.js"][0].apply(exports,arguments)
-},{"./util/inherits":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/util/inherits.js","eventemitter3":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/eventemitter3/index.js","lodash-node/modern/lang/isFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isFunction.js","lodash-node/modern/lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/store_watch_mixin.js":[function(require,module,exports){
+},{"./util/inherits":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/util/inherits.js","eventemitter3":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/eventemitter3/index.js","lodash/lang/isFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isFunction.js","lodash/lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/store_watch_mixin.js":[function(require,module,exports){
 arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/store_watch_mixin.js"][0].apply(exports,arguments)
-},{"lodash-node/modern/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/collection/forEach.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/util/inherits.js":[function(require,module,exports){
+},{"lodash/collection/forEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/collection/forEach.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/lib/util/inherits.js":[function(require,module,exports){
 arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/lib/util/inherits.js"][0].apply(exports,arguments)
 },{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/eventemitter3/index.js":[function(require,module,exports){
 arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/eventemitter3/index.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/array/intersection.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/array/intersection.js"][0].apply(exports,arguments)
-},{"../internal/baseIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseIndexOf.js","../internal/cacheIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/cacheIndexOf.js","../internal/createCache":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createCache.js","../lang/isArguments":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArguments.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArray.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/array/last.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/array/last.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/array/uniq.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/array/uniq.js"][0].apply(exports,arguments)
-},{"../internal/baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseCallback.js","../internal/baseUniq":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseUniq.js","../internal/isIterateeCall":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isIterateeCall.js","../internal/sortedUniq":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/sortedUniq.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/collection/forEach.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/forEach.js"][0].apply(exports,arguments)
-},{"../internal/arrayEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/arrayEach.js","../internal/baseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseEach.js","../internal/createForEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createForEach.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/collection/map.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/map.js"][0].apply(exports,arguments)
-},{"../internal/arrayMap":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/arrayMap.js","../internal/baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseCallback.js","../internal/baseMap":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseMap.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArray.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/collection/reduce.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/reduce.js"][0].apply(exports,arguments)
-},{"../internal/arrayReduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/arrayReduce.js","../internal/baseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseEach.js","../internal/createReduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createReduce.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/collection/size.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/collection/size.js"][0].apply(exports,arguments)
-},{"../internal/getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/getLength.js","../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isLength.js","../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/keys.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/SetCache.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/SetCache.js"][0].apply(exports,arguments)
-},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isNative.js","./cachePush":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/cachePush.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/arrayCopy.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/arrayCopy.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/arrayEach.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/arrayEach.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/arrayMap.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/arrayMap.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/arrayReduce.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/arrayReduce.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseAssign.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseAssign.js"][0].apply(exports,arguments)
-},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isNative.js","../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/keys.js","./baseCopy":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseCopy.js","./getSymbols":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/getSymbols.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseCallback.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseCallback.js"][0].apply(exports,arguments)
-},{"../utility/identity":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/utility/identity.js","../utility/property":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/utility/property.js","./baseMatches":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseMatches.js","./baseMatchesProperty":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseMatchesProperty.js","./bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/bindCallback.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseClone.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseClone.js"][0].apply(exports,arguments)
-},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArray.js","../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isObject.js","./arrayCopy":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/arrayCopy.js","./arrayEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/arrayEach.js","./baseAssign":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseAssign.js","./baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseForOwn.js","./initCloneArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/initCloneArray.js","./initCloneByTag":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/initCloneByTag.js","./initCloneObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/initCloneObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseCopy.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseCopy.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseEach.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseEach.js"][0].apply(exports,arguments)
-},{"./baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseForOwn.js","./createBaseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createBaseEach.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseFind.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseFind.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseFor.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseFor.js"][0].apply(exports,arguments)
-},{"./createBaseFor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createBaseFor.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseForOwn.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseForOwn.js"][0].apply(exports,arguments)
-},{"../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/keys.js","./baseFor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseFor.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseGet.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseGet.js"][0].apply(exports,arguments)
-},{"./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseIndexOf.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIndexOf.js"][0].apply(exports,arguments)
-},{"./indexOfNaN":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/indexOfNaN.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseIsEqual.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIsEqual.js"][0].apply(exports,arguments)
-},{"./baseIsEqualDeep":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseIsEqualDeep.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseIsEqualDeep.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIsEqualDeep.js"][0].apply(exports,arguments)
-},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArray.js","../lang/isTypedArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isTypedArray.js","./equalArrays":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/equalArrays.js","./equalByTag":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/equalByTag.js","./equalObjects":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/equalObjects.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseIsFunction.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIsFunction.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseIsMatch.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseIsMatch.js"][0].apply(exports,arguments)
-},{"./baseIsEqual":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseIsEqual.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseMap.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseMap.js"][0].apply(exports,arguments)
-},{"./baseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseEach.js","./getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/getLength.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isLength.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseMatches.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseMatches.js"][0].apply(exports,arguments)
-},{"../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/keys.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/utility/constant.js","./baseIsMatch":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseIsMatch.js","./isStrictComparable":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isStrictComparable.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseMatchesProperty.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseMatchesProperty.js"][0].apply(exports,arguments)
-},{"../array/last":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/array/last.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArray.js","./baseGet":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseGet.js","./baseIsEqual":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseIsEqual.js","./baseSlice":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseSlice.js","./isKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isKey.js","./isStrictComparable":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isStrictComparable.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/toObject.js","./toPath":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/toPath.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseProperty.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseProperty.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/basePropertyDeep.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/basePropertyDeep.js"][0].apply(exports,arguments)
-},{"./baseGet":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseGet.js","./toPath":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/toPath.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseReduce.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseReduce.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseSlice.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseSlice.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseToString.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseToString.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseUniq.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/baseUniq.js"][0].apply(exports,arguments)
-},{"./baseIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseIndexOf.js","./cacheIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/cacheIndexOf.js","./createCache":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createCache.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/bindCallback.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/bindCallback.js"][0].apply(exports,arguments)
-},{"../utility/identity":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/utility/identity.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/bufferClone.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/bufferClone.js"][0].apply(exports,arguments)
-},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isNative.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/utility/constant.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/cacheIndexOf.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/cacheIndexOf.js"][0].apply(exports,arguments)
-},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/cachePush.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/cachePush.js"][0].apply(exports,arguments)
-},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createBaseEach.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createBaseEach.js"][0].apply(exports,arguments)
-},{"./getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/getLength.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isLength.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createBaseFor.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createBaseFor.js"][0].apply(exports,arguments)
-},{"./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createCache.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createCache.js"][0].apply(exports,arguments)
-},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isNative.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/utility/constant.js","./SetCache":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/SetCache.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createFindKey.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createFindKey.js"][0].apply(exports,arguments)
-},{"./baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseCallback.js","./baseFind":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseFind.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createForEach.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createForEach.js"][0].apply(exports,arguments)
-},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArray.js","./bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/bindCallback.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createForOwn.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createForOwn.js"][0].apply(exports,arguments)
-},{"./bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/bindCallback.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createReduce.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/createReduce.js"][0].apply(exports,arguments)
-},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArray.js","./baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseCallback.js","./baseReduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseReduce.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/equalArrays.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/equalArrays.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/equalByTag.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/equalByTag.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/equalObjects.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/equalObjects.js"][0].apply(exports,arguments)
-},{"../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/keys.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/getLength.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/getLength.js"][0].apply(exports,arguments)
-},{"./baseProperty":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseProperty.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/getSymbols.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/getSymbols.js"][0].apply(exports,arguments)
-},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isNative.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/utility/constant.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/indexOfNaN.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/indexOfNaN.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/initCloneArray.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/initCloneArray.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/initCloneByTag.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/initCloneByTag.js"][0].apply(exports,arguments)
-},{"./bufferClone":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/bufferClone.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/initCloneObject.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/initCloneObject.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isIndex.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isIndex.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isIterateeCall.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isIterateeCall.js"][0].apply(exports,arguments)
-},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isObject.js","./getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/getLength.js","./isIndex":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isIndex.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isLength.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isKey.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isKey.js"][0].apply(exports,arguments)
-},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArray.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isLength.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isLength.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isObjectLike.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isObjectLike.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isStrictComparable.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/isStrictComparable.js"][0].apply(exports,arguments)
-},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/shimKeys.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/shimKeys.js"][0].apply(exports,arguments)
-},{"../lang/isArguments":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArguments.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArray.js","../object/keysIn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/keysIn.js","../support":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/support.js","./isIndex":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isIndex.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isLength.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/sortedUniq.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/sortedUniq.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/toObject.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/toObject.js"][0].apply(exports,arguments)
-},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/toPath.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/internal/toPath.js"][0].apply(exports,arguments)
-},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArray.js","./baseToString":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseToString.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/clone.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/clone.js"][0].apply(exports,arguments)
-},{"../internal/baseClone":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseClone.js","../internal/bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/bindCallback.js","../internal/isIterateeCall":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isIterateeCall.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArguments.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArguments.js"][0].apply(exports,arguments)
-},{"../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isLength.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArray.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isArray.js"][0].apply(exports,arguments)
-},{"../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isLength.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isObjectLike.js","./isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isNative.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isFunction.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isFunction.js"][0].apply(exports,arguments)
-},{"../internal/baseIsFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseIsFunction.js","./isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isNative.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isNative.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isNative.js"][0].apply(exports,arguments)
-},{"../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isObjectLike.js","../string/escapeRegExp":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/string/escapeRegExp.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isObject.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isObject.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isString.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isString.js"][0].apply(exports,arguments)
-},{"../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isTypedArray.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/lang/isTypedArray.js"][0].apply(exports,arguments)
-},{"../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isLength.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/findKey.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/findKey.js"][0].apply(exports,arguments)
-},{"../internal/baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseForOwn.js","../internal/createFindKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createFindKey.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/forOwn.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/forOwn.js"][0].apply(exports,arguments)
-},{"../internal/baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseForOwn.js","../internal/createForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/createForOwn.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/keys.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/keys.js"][0].apply(exports,arguments)
-},{"../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isLength.js","../internal/shimKeys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/shimKeys.js","../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isNative.js","../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/keysIn.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/keysIn.js"][0].apply(exports,arguments)
-},{"../internal/isIndex":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isIndex.js","../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isLength.js","../lang/isArguments":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArguments.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isArray.js","../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/lang/isObject.js","../support":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/support.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/object/mapValues.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/object/mapValues.js"][0].apply(exports,arguments)
-},{"../internal/baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseCallback.js","../internal/baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseForOwn.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/string/escapeRegExp.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/string/escapeRegExp.js"][0].apply(exports,arguments)
-},{"../internal/baseToString":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseToString.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/support.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/support.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/utility/constant.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/utility/constant.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/utility/identity.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/utility/identity.js"][0].apply(exports,arguments)
-},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/utility/property.js":[function(require,module,exports){
-arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash-node/modern/utility/property.js"][0].apply(exports,arguments)
-},{"../internal/baseProperty":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/baseProperty.js","../internal/basePropertyDeep":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/basePropertyDeep.js","../internal/isKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash-node/modern/internal/isKey.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/object-path/index.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/array/intersection.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/array/intersection.js"][0].apply(exports,arguments)
+},{"../internal/baseIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseIndexOf.js","../internal/cacheIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/cacheIndexOf.js","../internal/createCache":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createCache.js","../internal/isArrayLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isArrayLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/array/last.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/array/last.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/array/uniq.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/array/uniq.js"][0].apply(exports,arguments)
+},{"../internal/baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseCallback.js","../internal/baseUniq":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseUniq.js","../internal/isIterateeCall":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isIterateeCall.js","../internal/sortedUniq":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/sortedUniq.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/collection/forEach.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/forEach.js"][0].apply(exports,arguments)
+},{"../internal/arrayEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/arrayEach.js","../internal/baseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseEach.js","../internal/createForEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createForEach.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/collection/map.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/map.js"][0].apply(exports,arguments)
+},{"../internal/arrayMap":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/arrayMap.js","../internal/baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseCallback.js","../internal/baseMap":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseMap.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isArray.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/collection/reduce.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/reduce.js"][0].apply(exports,arguments)
+},{"../internal/arrayReduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/arrayReduce.js","../internal/baseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseEach.js","../internal/createReduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createReduce.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/collection/size.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/collection/size.js"][0].apply(exports,arguments)
+},{"../internal/getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/getLength.js","../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isLength.js","../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/keys.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/SetCache.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/SetCache.js"][0].apply(exports,arguments)
+},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isNative.js","./cachePush":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/cachePush.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/arrayCopy.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/arrayCopy.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/arrayEach.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/arrayEach.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/arrayMap.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/arrayMap.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/arrayReduce.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/arrayReduce.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseAssign.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseAssign.js"][0].apply(exports,arguments)
+},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isNative.js","../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/keys.js","./baseCopy":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseCopy.js","./getSymbols":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/getSymbols.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseCallback.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseCallback.js"][0].apply(exports,arguments)
+},{"../utility/identity":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/utility/identity.js","../utility/property":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/utility/property.js","./baseMatches":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseMatches.js","./baseMatchesProperty":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseMatchesProperty.js","./bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/bindCallback.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseClone.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseClone.js"][0].apply(exports,arguments)
+},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isArray.js","../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isObject.js","./arrayCopy":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/arrayCopy.js","./arrayEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/arrayEach.js","./baseAssign":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseAssign.js","./baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseForOwn.js","./initCloneArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/initCloneArray.js","./initCloneByTag":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/initCloneByTag.js","./initCloneObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/initCloneObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseCopy.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseCopy.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseEach.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseEach.js"][0].apply(exports,arguments)
+},{"./baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseForOwn.js","./createBaseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createBaseEach.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseFind.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseFind.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseFor.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseFor.js"][0].apply(exports,arguments)
+},{"./createBaseFor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createBaseFor.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseForOwn.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseForOwn.js"][0].apply(exports,arguments)
+},{"../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/keys.js","./baseFor":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseFor.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseGet.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseGet.js"][0].apply(exports,arguments)
+},{"./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseIndexOf.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIndexOf.js"][0].apply(exports,arguments)
+},{"./indexOfNaN":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/indexOfNaN.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseIsEqual.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIsEqual.js"][0].apply(exports,arguments)
+},{"./baseIsEqualDeep":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseIsEqualDeep.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseIsEqualDeep.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIsEqualDeep.js"][0].apply(exports,arguments)
+},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isArray.js","../lang/isTypedArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isTypedArray.js","./equalArrays":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/equalArrays.js","./equalByTag":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/equalByTag.js","./equalObjects":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/equalObjects.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseIsFunction.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIsFunction.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseIsMatch.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseIsMatch.js"][0].apply(exports,arguments)
+},{"./baseIsEqual":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseIsEqual.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseMap.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseMap.js"][0].apply(exports,arguments)
+},{"./baseEach":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseEach.js","./isArrayLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isArrayLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseMatches.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseMatches.js"][0].apply(exports,arguments)
+},{"../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/keys.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/utility/constant.js","./baseIsMatch":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseIsMatch.js","./isStrictComparable":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isStrictComparable.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseMatchesProperty.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseMatchesProperty.js"][0].apply(exports,arguments)
+},{"../array/last":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/array/last.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isArray.js","./baseGet":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseGet.js","./baseIsEqual":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseIsEqual.js","./baseSlice":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseSlice.js","./isKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isKey.js","./isStrictComparable":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isStrictComparable.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/toObject.js","./toPath":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/toPath.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseProperty.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseProperty.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/basePropertyDeep.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/basePropertyDeep.js"][0].apply(exports,arguments)
+},{"./baseGet":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseGet.js","./toPath":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/toPath.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseReduce.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseReduce.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseSlice.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseSlice.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseToString.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseToString.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseUniq.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseUniq.js"][0].apply(exports,arguments)
+},{"./baseIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseIndexOf.js","./cacheIndexOf":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/cacheIndexOf.js","./createCache":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createCache.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/bindCallback.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/bindCallback.js"][0].apply(exports,arguments)
+},{"../utility/identity":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/utility/identity.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/bufferClone.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/bufferClone.js"][0].apply(exports,arguments)
+},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isNative.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/utility/constant.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/cacheIndexOf.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/cacheIndexOf.js"][0].apply(exports,arguments)
+},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/cachePush.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/cachePush.js"][0].apply(exports,arguments)
+},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createBaseEach.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createBaseEach.js"][0].apply(exports,arguments)
+},{"./getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/getLength.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isLength.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createBaseFor.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createBaseFor.js"][0].apply(exports,arguments)
+},{"./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createCache.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createCache.js"][0].apply(exports,arguments)
+},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isNative.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/utility/constant.js","./SetCache":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/SetCache.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createFindKey.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createFindKey.js"][0].apply(exports,arguments)
+},{"./baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseCallback.js","./baseFind":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseFind.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createForEach.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createForEach.js"][0].apply(exports,arguments)
+},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isArray.js","./bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/bindCallback.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createForOwn.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createForOwn.js"][0].apply(exports,arguments)
+},{"./bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/bindCallback.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createObjectMapper.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createObjectMapper.js"][0].apply(exports,arguments)
+},{"./baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseCallback.js","./baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseForOwn.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createReduce.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/createReduce.js"][0].apply(exports,arguments)
+},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isArray.js","./baseCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseCallback.js","./baseReduce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseReduce.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/equalArrays.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/equalArrays.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/equalByTag.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/equalByTag.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/equalObjects.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/equalObjects.js"][0].apply(exports,arguments)
+},{"../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/keys.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/getLength.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/getLength.js"][0].apply(exports,arguments)
+},{"./baseProperty":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseProperty.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/getSymbols.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/getSymbols.js"][0].apply(exports,arguments)
+},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isNative.js","../utility/constant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/utility/constant.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/indexOfNaN.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/indexOfNaN.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/initCloneArray.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/initCloneArray.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/initCloneByTag.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/initCloneByTag.js"][0].apply(exports,arguments)
+},{"./bufferClone":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/bufferClone.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/initCloneObject.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/initCloneObject.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isArrayLike.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isArrayLike.js"][0].apply(exports,arguments)
+},{"./getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/getLength.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isLength.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isIndex.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isIndex.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isIterateeCall.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isIterateeCall.js"][0].apply(exports,arguments)
+},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isObject.js","./isArrayLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isArrayLike.js","./isIndex":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isIndex.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isKey.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isKey.js"][0].apply(exports,arguments)
+},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isArray.js","./toObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/toObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isLength.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isLength.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isObjectLike.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isObjectLike.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isStrictComparable.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isStrictComparable.js"][0].apply(exports,arguments)
+},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/shimKeys.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/shimKeys.js"][0].apply(exports,arguments)
+},{"../lang/isArguments":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isArguments.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isArray.js","../object/keysIn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/keysIn.js","../support":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/support.js","./isIndex":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isIndex.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isLength.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/sortedUniq.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/sortedUniq.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/toObject.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/toObject.js"][0].apply(exports,arguments)
+},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/toPath.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/toPath.js"][0].apply(exports,arguments)
+},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isArray.js","./baseToString":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseToString.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/clone.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/clone.js"][0].apply(exports,arguments)
+},{"../internal/baseClone":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseClone.js","../internal/bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/bindCallback.js","../internal/isIterateeCall":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isIterateeCall.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isArguments.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArguments.js"][0].apply(exports,arguments)
+},{"../internal/isArrayLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isArrayLike.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isArray.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArray.js"][0].apply(exports,arguments)
+},{"../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isLength.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isObjectLike.js","./isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isNative.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isFunction.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isFunction.js"][0].apply(exports,arguments)
+},{"../internal/baseIsFunction":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseIsFunction.js","./isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isNative.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isNative.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isNative.js"][0].apply(exports,arguments)
+},{"../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isObjectLike.js","../string/escapeRegExp":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/string/escapeRegExp.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isObject.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isObject.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isString.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isString.js"][0].apply(exports,arguments)
+},{"../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isTypedArray.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isTypedArray.js"][0].apply(exports,arguments)
+},{"../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isLength.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/findKey.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/findKey.js"][0].apply(exports,arguments)
+},{"../internal/baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseForOwn.js","../internal/createFindKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createFindKey.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/forOwn.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/forOwn.js"][0].apply(exports,arguments)
+},{"../internal/baseForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseForOwn.js","../internal/createForOwn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createForOwn.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/keys.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/keys.js"][0].apply(exports,arguments)
+},{"../internal/isArrayLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isArrayLike.js","../internal/shimKeys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/shimKeys.js","../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isNative.js","../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/keysIn.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/keysIn.js"][0].apply(exports,arguments)
+},{"../internal/isIndex":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isIndex.js","../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isLength.js","../lang/isArguments":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isArguments.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isArray.js","../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/lang/isObject.js","../support":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/support.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/object/mapValues.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/object/mapValues.js"][0].apply(exports,arguments)
+},{"../internal/createObjectMapper":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/createObjectMapper.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/string/escapeRegExp.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/string/escapeRegExp.js"][0].apply(exports,arguments)
+},{"../internal/baseToString":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseToString.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/support.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/support.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/utility/constant.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/utility/constant.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/utility/identity.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/utility/identity.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/utility/property.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/utility/property.js"][0].apply(exports,arguments)
+},{"../internal/baseProperty":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/baseProperty.js","../internal/basePropertyDeep":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/basePropertyDeep.js","../internal/isKey":"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/lodash/internal/isKey.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/node_modules/object-path/index.js":[function(require,module,exports){
 arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/object-path/index.js"][0].apply(exports,arguments)
 },{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/fluxxor/version.js":[function(require,module,exports){
 arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/version.js"][0].apply(exports,arguments)
@@ -14934,20 +15241,20 @@ return jQuery;
 }()));
 
 },{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Cancellation.js":[function(require,module,exports){
-"use strict";
-
 /**
  * Represents a cancellation caused by navigating away
  * before the previous transition has fully resolved.
  */
+"use strict";
+
 function Cancellation() {}
 
 module.exports = Cancellation;
 },{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/History.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var invariant = require("react/lib/invariant");
-var canUseDOM = require("react/lib/ExecutionEnvironment").canUseDOM;
+var invariant = require('react/lib/invariant');
+var canUseDOM = require('react/lib/ExecutionEnvironment').canUseDOM;
 
 var History = {
 
@@ -14962,7 +15269,7 @@ var History = {
    * Sends the browser back one entry in the history.
    */
   back: function back() {
-    invariant(canUseDOM, "Cannot use History.back without a DOM");
+    invariant(canUseDOM, 'Cannot use History.back without a DOM');
 
     // Do this first so that History.length will
     // be accurate in location change listeners.
@@ -14975,14 +15282,14 @@ var History = {
 
 module.exports = History;
 },{"react/lib/ExecutionEnvironment":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/ExecutionEnvironment.js","react/lib/invariant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/invariant.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Match.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var _createClass = (function () { function defineProperties(target, props) { for (var key in props) { var prop = props[key]; prop.configurable = true; if (prop.value) prop.writable = true; } Object.defineProperties(target, props); } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } };
 
-var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
 /* jshint -W084 */
-var PathUtils = require("./PathUtils");
+var PathUtils = require('./PathUtils');
 
 function deepSearch(route, pathname, query) {
   // Check the subtree first to find the most deeply-nested match.
@@ -15027,44 +15334,33 @@ var Match = (function () {
     this.routes = routes;
   }
 
-  _createClass(Match, null, {
-    findMatch: {
+  _createClass(Match, null, [{
+    key: 'findMatch',
 
-      /**
-       * Attempts to match depth-first a route in the given route's
-       * subtree against the given path and returns the match if it
-       * succeeds, null if no match can be made.
-       */
+    /**
+     * Attempts to match depth-first a route in the given route's
+     * subtree against the given path and returns the match if it
+     * succeeds, null if no match can be made.
+     */
+    value: function findMatch(routes, path) {
+      var pathname = PathUtils.withoutQuery(path);
+      var query = PathUtils.extractQuery(path);
+      var match = null;
 
-      value: function findMatch(routes, path) {
-        var pathname = PathUtils.withoutQuery(path);
-        var query = PathUtils.extractQuery(path);
-        var match = null;
+      for (var i = 0, len = routes.length; match == null && i < len; ++i) match = deepSearch(routes[i], pathname, query);
 
-        for (var i = 0, len = routes.length; match == null && i < len; ++i) match = deepSearch(routes[i], pathname, query);
-
-        return match;
-      }
+      return match;
     }
-  });
+  }]);
 
   return Match;
 })();
 
 module.exports = Match;
 },{"./PathUtils":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PathUtils.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Navigation.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var warning = require("react/lib/warning");
-var PropTypes = require("./PropTypes");
-
-function deprecatedMethod(routerMethodName, fn) {
-  return function () {
-    warning(false, "Router.Navigation is deprecated. Please use this.context.router." + routerMethodName + "() instead");
-
-    return fn.apply(this, arguments);
-  };
-}
+var PropTypes = require('./PropTypes');
 
 /**
  * A mixin for components that modify the URL.
@@ -15094,50 +15390,50 @@ var Navigation = {
    * Returns an absolute URL path created from the given route
    * name, URL parameters, and query values.
    */
-  makePath: deprecatedMethod("makePath", function (to, params, query) {
+  makePath: function makePath(to, params, query) {
     return this.context.router.makePath(to, params, query);
-  }),
+  },
 
   /**
    * Returns a string that may safely be used as the href of a
    * link to the route with the given name.
    */
-  makeHref: deprecatedMethod("makeHref", function (to, params, query) {
+  makeHref: function makeHref(to, params, query) {
     return this.context.router.makeHref(to, params, query);
-  }),
+  },
 
   /**
    * Transitions to the URL specified in the arguments by pushing
    * a new URL onto the history stack.
    */
-  transitionTo: deprecatedMethod("transitionTo", function (to, params, query) {
+  transitionTo: function transitionTo(to, params, query) {
     this.context.router.transitionTo(to, params, query);
-  }),
+  },
 
   /**
    * Transitions to the URL specified in the arguments by replacing
    * the current URL in the history stack.
    */
-  replaceWith: deprecatedMethod("replaceWith", function (to, params, query) {
+  replaceWith: function replaceWith(to, params, query) {
     this.context.router.replaceWith(to, params, query);
-  }),
+  },
 
   /**
    * Transitions to the previous URL.
    */
-  goBack: deprecatedMethod("goBack", function () {
+  goBack: function goBack() {
     return this.context.router.goBack();
-  })
+  }
 
 };
 
 module.exports = Navigation;
-},{"./PropTypes":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PropTypes.js","react/lib/warning":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/warning.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PathUtils.js":[function(require,module,exports){
-"use strict";
+},{"./PropTypes":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PropTypes.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PathUtils.js":[function(require,module,exports){
+'use strict';
 
-var invariant = require("react/lib/invariant");
-var objectAssign = require("object-assign");
-var qs = require("qs");
+var invariant = require('react/lib/invariant');
+var assign = require('object-assign');
+var qs = require('qs');
 
 var paramCompileMatcher = /:([a-zA-Z_$][a-zA-Z0-9_$]*)|[*.()\[\]\\+|{}^$]/g;
 var paramInjectMatcher = /:([a-zA-Z_$][a-zA-Z0-9_$?]*[?]?)|[*]/g;
@@ -15152,17 +15448,17 @@ function compilePattern(pattern) {
     var source = pattern.replace(paramCompileMatcher, function (match, paramName) {
       if (paramName) {
         paramNames.push(paramName);
-        return "([^/?#]+)";
-      } else if (match === "*") {
-        paramNames.push("splat");
-        return "(.*?)";
+        return '([^/?#]+)';
+      } else if (match === '*') {
+        paramNames.push('splat');
+        return '(.*?)';
       } else {
-        return "\\" + match;
+        return '\\' + match;
       }
     });
 
     _compiledPatterns[pattern] = {
-      matcher: new RegExp("^" + source + "$", "i"),
+      matcher: new RegExp('^' + source + '$', 'i'),
       paramNames: paramNames
     };
   }
@@ -15176,14 +15472,14 @@ var PathUtils = {
    * Returns true if the given path is absolute.
    */
   isAbsolute: function isAbsolute(path) {
-    return path.charAt(0) === "/";
+    return path.charAt(0) === '/';
   },
 
   /**
    * Joins two URL paths together.
    */
   join: function join(a, b) {
-    return a.replace(/\/*$/, "/") + b;
+    return a.replace(/\/*$/, '/') + b;
   },
 
   /**
@@ -15227,28 +15523,28 @@ var PathUtils = {
     var splatIndex = 0;
 
     return pattern.replace(paramInjectMatcher, function (match, paramName) {
-      paramName = paramName || "splat";
+      paramName = paramName || 'splat';
 
       // If param is optional don't check for existence
-      if (paramName.slice(-1) === "?") {
+      if (paramName.slice(-1) === '?') {
         paramName = paramName.slice(0, -1);
 
-        if (params[paramName] == null) return "";
+        if (params[paramName] == null) return '';
       } else {
-        invariant(params[paramName] != null, "Missing \"%s\" parameter for path \"%s\"", paramName, pattern);
+        invariant(params[paramName] != null, 'Missing "%s" parameter for path "%s"', paramName, pattern);
       }
 
       var segment;
-      if (paramName === "splat" && Array.isArray(params[paramName])) {
+      if (paramName === 'splat' && Array.isArray(params[paramName])) {
         segment = params[paramName][splatIndex++];
 
-        invariant(segment != null, "Missing splat # %s for path \"%s\"", splatIndex, pattern);
+        invariant(segment != null, 'Missing splat # %s for path "%s"', splatIndex, pattern);
       } else {
         segment = params[paramName];
       }
 
       return segment;
-    }).replace(paramInjectTrailingSlashMatcher, "/");
+    }).replace(paramInjectTrailingSlashMatcher, '/');
   },
 
   /**
@@ -15264,7 +15560,7 @@ var PathUtils = {
    * Returns a version of the given path without the query string.
    */
   withoutQuery: function withoutQuery(path) {
-    return path.replace(queryMatcher, "");
+    return path.replace(queryMatcher, '');
   },
 
   /**
@@ -15274,12 +15570,12 @@ var PathUtils = {
   withQuery: function withQuery(path, query) {
     var existingQuery = PathUtils.extractQuery(path);
 
-    if (existingQuery) query = query ? objectAssign(existingQuery, query) : existingQuery;
+    if (existingQuery) query = query ? assign(existingQuery, query) : existingQuery;
 
-    var queryString = qs.stringify(query, { arrayFormat: "brackets" });
+    var queryString = qs.stringify(query, { arrayFormat: 'brackets' });
 
     if (queryString) {
-      return PathUtils.withoutQuery(path) + "?" + queryString;
+      return PathUtils.withoutQuery(path) + '?' + queryString;
     }return PathUtils.withoutQuery(path);
   }
 
@@ -15287,11 +15583,11 @@ var PathUtils = {
 
 module.exports = PathUtils;
 },{"object-assign":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/node_modules/object-assign/index.js","qs":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/node_modules/qs/index.js","react/lib/invariant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/invariant.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PropTypes.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var assign = require("react/lib/Object.assign");
-var ReactPropTypes = require("react").PropTypes;
-var Route = require("./Route");
+var assign = require('react/lib/Object.assign');
+var ReactPropTypes = require('react').PropTypes;
+var Route = require('./Route');
 
 var PropTypes = assign({}, ReactPropTypes, {
 
@@ -15300,7 +15596,7 @@ var PropTypes = assign({}, ReactPropTypes, {
    */
   falsy: function falsy(props, propName, componentName) {
     if (props[propName]) {
-      return new Error("<" + componentName + "> may not have a \"" + propName + "\" prop");
+      return new Error('<' + componentName + '> should not have a "' + propName + '" prop');
     }
   },
 
@@ -15319,11 +15615,11 @@ var PropTypes = assign({}, ReactPropTypes, {
 
 module.exports = PropTypes;
 },{"./Route":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Route.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react/lib/Object.assign":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/Object.assign.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Redirect.js":[function(require,module,exports){
-"use strict";
-
 /**
  * Encapsulates a redirect to the given route.
  */
+"use strict";
+
 function Redirect(to, params, query) {
   this.to = to;
   this.params = params;
@@ -15332,16 +15628,16 @@ function Redirect(to, params, query) {
 
 module.exports = Redirect;
 },{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Route.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var _createClass = (function () { function defineProperties(target, props) { for (var key in props) { var prop = props[key]; prop.configurable = true; if (prop.value) prop.writable = true; } Object.defineProperties(target, props); } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } };
 
-var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
-var assign = require("react/lib/Object.assign");
-var invariant = require("react/lib/invariant");
-var warning = require("react/lib/warning");
-var PathUtils = require("./PathUtils");
+var assign = require('react/lib/Object.assign');
+var invariant = require('react/lib/invariant');
+var warning = require('react/lib/warning');
+var PathUtils = require('./PathUtils');
 
 var _currentRoute;
 
@@ -15360,191 +15656,184 @@ var Route = (function () {
     this.handler = handler;
   }
 
-  _createClass(Route, {
-    appendChild: {
+  _createClass(Route, [{
+    key: 'appendChild',
 
-      /**
-       * Appends the given route to this route's child routes.
-       */
+    /**
+     * Appends the given route to this route's child routes.
+     */
+    value: function appendChild(route) {
+      invariant(route instanceof Route, 'route.appendChild must use a valid Route');
 
-      value: function appendChild(route) {
-        invariant(route instanceof Route, "route.appendChild must use a valid Route");
+      if (!this.childRoutes) this.childRoutes = [];
 
-        if (!this.childRoutes) this.childRoutes = [];
-
-        this.childRoutes.push(route);
-      }
-    },
-    toString: {
-      value: function toString() {
-        var string = "<Route";
-
-        if (this.name) string += " name=\"" + this.name + "\"";
-
-        string += " path=\"" + this.path + "\">";
-
-        return string;
-      }
+      this.childRoutes.push(route);
     }
   }, {
-    createRoute: {
+    key: 'toString',
+    value: function toString() {
+      var string = '<Route';
 
-      /**
-       * Creates and returns a new route. Options may be a URL pathname string
-       * with placeholders for named params or an object with any of the following
-       * properties:
-       *
-       * - name                     The name of the route. This is used to lookup a
-       *                            route relative to its parent route and should be
-       *                            unique among all child routes of the same parent
-       * - path                     A URL pathname string with optional placeholders
-       *                            that specify the names of params to extract from
-       *                            the URL when the path matches. Defaults to `/${name}`
-       *                            when there is a name given, or the path of the parent
-       *                            route, or /
-       * - ignoreScrollBehavior     True to make this route (and all descendants) ignore
-       *                            the scroll behavior of the router
-       * - isDefault                True to make this route the default route among all
-       *                            its siblings
-       * - isNotFound               True to make this route the "not found" route among
-       *                            all its siblings
-       * - onEnter                  A transition hook that will be called when the
-       *                            router is going to enter this route
-       * - onLeave                  A transition hook that will be called when the
-       *                            router is going to leave this route
-       * - handler                  A React component that will be rendered when
-       *                            this route is active
-       * - parentRoute              The parent route to use for this route. This option
-       *                            is automatically supplied when creating routes inside
-       *                            the callback to another invocation of createRoute. You
-       *                            only ever need to use this when declaring routes
-       *                            independently of one another to manually piece together
-       *                            the route hierarchy
-       *
-       * The callback may be used to structure your route hierarchy. Any call to
-       * createRoute, createDefaultRoute, createNotFoundRoute, or createRedirect
-       * inside the callback automatically uses this route as its parent.
-       */
+      if (this.name) string += ' name="' + this.name + '"';
 
-      value: function createRoute(options, callback) {
-        options = options || {};
+      string += ' path="' + this.path + '">';
 
-        if (typeof options === "string") options = { path: options };
-
-        var parentRoute = _currentRoute;
-
-        if (parentRoute) {
-          warning(options.parentRoute == null || options.parentRoute === parentRoute, "You should not use parentRoute with createRoute inside another route's child callback; it is ignored");
-        } else {
-          parentRoute = options.parentRoute;
-        }
-
-        var name = options.name;
-        var path = options.path || name;
-
-        if (path && !(options.isDefault || options.isNotFound)) {
-          if (PathUtils.isAbsolute(path)) {
-            if (parentRoute) {
-              invariant(path === parentRoute.path || parentRoute.paramNames.length === 0, "You cannot nest path \"%s\" inside \"%s\"; the parent requires URL parameters", path, parentRoute.path);
-            }
-          } else if (parentRoute) {
-            // Relative paths extend their parent.
-            path = PathUtils.join(parentRoute.path, path);
-          } else {
-            path = "/" + path;
-          }
-        } else {
-          path = parentRoute ? parentRoute.path : "/";
-        }
-
-        if (options.isNotFound && !/\*$/.test(path)) path += "*"; // Auto-append * to the path of not found routes.
-
-        var route = new Route(name, path, options.ignoreScrollBehavior, options.isDefault, options.isNotFound, options.onEnter, options.onLeave, options.handler);
-
-        if (parentRoute) {
-          if (route.isDefault) {
-            invariant(parentRoute.defaultRoute == null, "%s may not have more than one default route", parentRoute);
-
-            parentRoute.defaultRoute = route;
-          } else if (route.isNotFound) {
-            invariant(parentRoute.notFoundRoute == null, "%s may not have more than one not found route", parentRoute);
-
-            parentRoute.notFoundRoute = route;
-          }
-
-          parentRoute.appendChild(route);
-        }
-
-        // Any routes created in the callback
-        // use this route as their parent.
-        if (typeof callback === "function") {
-          var currentRoute = _currentRoute;
-          _currentRoute = route;
-          callback.call(route, route);
-          _currentRoute = currentRoute;
-        }
-
-        return route;
-      }
-    },
-    createDefaultRoute: {
-
-      /**
-       * Creates and returns a route that is rendered when its parent matches
-       * the current URL.
-       */
-
-      value: function createDefaultRoute(options) {
-        return Route.createRoute(assign({}, options, { isDefault: true }));
-      }
-    },
-    createNotFoundRoute: {
-
-      /**
-       * Creates and returns a route that is rendered when its parent matches
-       * the current URL but none of its siblings do.
-       */
-
-      value: function createNotFoundRoute(options) {
-        return Route.createRoute(assign({}, options, { isNotFound: true }));
-      }
-    },
-    createRedirect: {
-
-      /**
-       * Creates and returns a route that automatically redirects the transition
-       * to another route. In addition to the normal options to createRoute, this
-       * function accepts the following options:
-       *
-       * - from         An alias for the `path` option. Defaults to *
-       * - to           The path/route/route name to redirect to
-       * - params       The params to use in the redirect URL. Defaults
-       *                to using the current params
-       * - query        The query to use in the redirect URL. Defaults
-       *                to using the current query
-       */
-
-      value: function createRedirect(options) {
-        return Route.createRoute(assign({}, options, {
-          path: options.path || options.from || "*",
-          onEnter: function onEnter(transition, params, query) {
-            transition.redirect(options.to, options.params || params, options.query || query);
-          }
-        }));
-      }
+      return string;
     }
-  });
+  }], [{
+    key: 'createRoute',
+
+    /**
+     * Creates and returns a new route. Options may be a URL pathname string
+     * with placeholders for named params or an object with any of the following
+     * properties:
+     *
+     * - name                     The name of the route. This is used to lookup a
+     *                            route relative to its parent route and should be
+     *                            unique among all child routes of the same parent
+     * - path                     A URL pathname string with optional placeholders
+     *                            that specify the names of params to extract from
+     *                            the URL when the path matches. Defaults to `/${name}`
+     *                            when there is a name given, or the path of the parent
+     *                            route, or /
+     * - ignoreScrollBehavior     True to make this route (and all descendants) ignore
+     *                            the scroll behavior of the router
+     * - isDefault                True to make this route the default route among all
+     *                            its siblings
+     * - isNotFound               True to make this route the "not found" route among
+     *                            all its siblings
+     * - onEnter                  A transition hook that will be called when the
+     *                            router is going to enter this route
+     * - onLeave                  A transition hook that will be called when the
+     *                            router is going to leave this route
+     * - handler                  A React component that will be rendered when
+     *                            this route is active
+     * - parentRoute              The parent route to use for this route. This option
+     *                            is automatically supplied when creating routes inside
+     *                            the callback to another invocation of createRoute. You
+     *                            only ever need to use this when declaring routes
+     *                            independently of one another to manually piece together
+     *                            the route hierarchy
+     *
+     * The callback may be used to structure your route hierarchy. Any call to
+     * createRoute, createDefaultRoute, createNotFoundRoute, or createRedirect
+     * inside the callback automatically uses this route as its parent.
+     */
+    value: function createRoute(options, callback) {
+      options = options || {};
+
+      if (typeof options === 'string') options = { path: options };
+
+      var parentRoute = _currentRoute;
+
+      if (parentRoute) {
+        warning(options.parentRoute == null || options.parentRoute === parentRoute, 'You should not use parentRoute with createRoute inside another route\'s child callback; it is ignored');
+      } else {
+        parentRoute = options.parentRoute;
+      }
+
+      var name = options.name;
+      var path = options.path || name;
+
+      if (path && !(options.isDefault || options.isNotFound)) {
+        if (PathUtils.isAbsolute(path)) {
+          if (parentRoute) {
+            invariant(path === parentRoute.path || parentRoute.paramNames.length === 0, 'You cannot nest path "%s" inside "%s"; the parent requires URL parameters', path, parentRoute.path);
+          }
+        } else if (parentRoute) {
+          // Relative paths extend their parent.
+          path = PathUtils.join(parentRoute.path, path);
+        } else {
+          path = '/' + path;
+        }
+      } else {
+        path = parentRoute ? parentRoute.path : '/';
+      }
+
+      if (options.isNotFound && !/\*$/.test(path)) path += '*'; // Auto-append * to the path of not found routes.
+
+      var route = new Route(name, path, options.ignoreScrollBehavior, options.isDefault, options.isNotFound, options.onEnter, options.onLeave, options.handler);
+
+      if (parentRoute) {
+        if (route.isDefault) {
+          invariant(parentRoute.defaultRoute == null, '%s may not have more than one default route', parentRoute);
+
+          parentRoute.defaultRoute = route;
+        } else if (route.isNotFound) {
+          invariant(parentRoute.notFoundRoute == null, '%s may not have more than one not found route', parentRoute);
+
+          parentRoute.notFoundRoute = route;
+        }
+
+        parentRoute.appendChild(route);
+      }
+
+      // Any routes created in the callback
+      // use this route as their parent.
+      if (typeof callback === 'function') {
+        var currentRoute = _currentRoute;
+        _currentRoute = route;
+        callback.call(route, route);
+        _currentRoute = currentRoute;
+      }
+
+      return route;
+    }
+  }, {
+    key: 'createDefaultRoute',
+
+    /**
+     * Creates and returns a route that is rendered when its parent matches
+     * the current URL.
+     */
+    value: function createDefaultRoute(options) {
+      return Route.createRoute(assign({}, options, { isDefault: true }));
+    }
+  }, {
+    key: 'createNotFoundRoute',
+
+    /**
+     * Creates and returns a route that is rendered when its parent matches
+     * the current URL but none of its siblings do.
+     */
+    value: function createNotFoundRoute(options) {
+      return Route.createRoute(assign({}, options, { isNotFound: true }));
+    }
+  }, {
+    key: 'createRedirect',
+
+    /**
+     * Creates and returns a route that automatically redirects the transition
+     * to another route. In addition to the normal options to createRoute, this
+     * function accepts the following options:
+     *
+     * - from         An alias for the `path` option. Defaults to *
+     * - to           The path/route/route name to redirect to
+     * - params       The params to use in the redirect URL. Defaults
+     *                to using the current params
+     * - query        The query to use in the redirect URL. Defaults
+     *                to using the current query
+     */
+    value: function createRedirect(options) {
+      return Route.createRoute(assign({}, options, {
+        path: options.path || options.from || '*',
+        onEnter: function onEnter(transition, params, query) {
+          transition.redirect(options.to, options.params || params, options.query || query);
+        }
+      }));
+    }
+  }]);
 
   return Route;
 })();
 
 module.exports = Route;
 },{"./PathUtils":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PathUtils.js","react/lib/Object.assign":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/Object.assign.js","react/lib/invariant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/invariant.js","react/lib/warning":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/warning.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/ScrollHistory.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var invariant = require("react/lib/invariant");
-var canUseDOM = require("react/lib/ExecutionEnvironment").canUseDOM;
-var getWindowScrollPosition = require("./getWindowScrollPosition");
+var invariant = require('react/lib/invariant');
+var canUseDOM = require('react/lib/ExecutionEnvironment').canUseDOM;
+var getWindowScrollPosition = require('./getWindowScrollPosition');
 
 function shouldUpdateScroll(state, prevState) {
   if (!prevState) {
@@ -15593,7 +15882,7 @@ var ScrollHistory = {
   },
 
   componentWillMount: function componentWillMount() {
-    invariant(this.constructor.getScrollBehavior() == null || canUseDOM, "Cannot use scroll behavior without a DOM");
+    invariant(this.constructor.getScrollBehavior() == null || canUseDOM, 'Cannot use scroll behavior without a DOM');
   },
 
   componentDidMount: function componentDidMount() {
@@ -15616,18 +15905,9 @@ var ScrollHistory = {
 
 module.exports = ScrollHistory;
 },{"./getWindowScrollPosition":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/getWindowScrollPosition.js","react/lib/ExecutionEnvironment":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/ExecutionEnvironment.js","react/lib/invariant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/invariant.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/State.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var warning = require("react/lib/warning");
-var PropTypes = require("./PropTypes");
-
-function deprecatedMethod(routerMethodName, fn) {
-  return function () {
-    warning(false, "Router.State is deprecated. Please use this.context.router." + routerMethodName + "() instead");
-
-    return fn.apply(this, arguments);
-  };
-}
+var PropTypes = require('./PropTypes');
 
 /**
  * A mixin for components that need to know the path, routes, URL
@@ -15639,10 +15919,10 @@ function deprecatedMethod(routerMethodName, fn) {
  *     mixins: [ Router.State ],
  *     render() {
  *       var className = this.props.className;
- *   
+ *
  *       if (this.isActive('about'))
  *         className += ' is-active';
- *   
+ *
  *       return React.DOM.a({ className: className }, this.props.children);
  *     }
  *   });
@@ -15656,56 +15936,56 @@ var State = {
   /**
    * Returns the current URL path.
    */
-  getPath: deprecatedMethod("getCurrentPath", function () {
+  getPath: function getPath() {
     return this.context.router.getCurrentPath();
-  }),
+  },
 
   /**
    * Returns the current URL path without the query string.
    */
-  getPathname: deprecatedMethod("getCurrentPathname", function () {
+  getPathname: function getPathname() {
     return this.context.router.getCurrentPathname();
-  }),
+  },
 
   /**
    * Returns an object of the URL params that are currently active.
    */
-  getParams: deprecatedMethod("getCurrentParams", function () {
+  getParams: function getParams() {
     return this.context.router.getCurrentParams();
-  }),
+  },
 
   /**
    * Returns an object of the query params that are currently active.
    */
-  getQuery: deprecatedMethod("getCurrentQuery", function () {
+  getQuery: function getQuery() {
     return this.context.router.getCurrentQuery();
-  }),
+  },
 
   /**
    * Returns an array of the routes that are currently active.
    */
-  getRoutes: deprecatedMethod("getCurrentRoutes", function () {
+  getRoutes: function getRoutes() {
     return this.context.router.getCurrentRoutes();
-  }),
+  },
 
   /**
    * A helper method to determine if a given route, params, and query
    * are active.
    */
-  isActive: deprecatedMethod("isActive", function (to, params, query) {
+  isActive: function isActive(to, params, query) {
     return this.context.router.isActive(to, params, query);
-  })
+  }
 
 };
 
 module.exports = State;
-},{"./PropTypes":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PropTypes.js","react/lib/warning":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/warning.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Transition.js":[function(require,module,exports){
-"use strict";
-
+},{"./PropTypes":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PropTypes.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Transition.js":[function(require,module,exports){
 /* jshint -W058 */
 
-var Cancellation = require("./Cancellation");
-var Redirect = require("./Redirect");
+'use strict';
+
+var Cancellation = require('./Cancellation');
+var Redirect = require('./Redirect');
 
 /**
  * Encapsulates a transition to a given path.
@@ -15721,7 +16001,7 @@ function Transition(path, retry) {
 }
 
 Transition.prototype.abort = function (reason) {
-  if (this.abortReason == null) this.abortReason = reason || "ABORT";
+  if (this.abortReason == null) this.abortReason = reason || 'ABORT';
 };
 
 Transition.prototype.redirect = function (to, params, query) {
@@ -15776,35 +16056,35 @@ Transition.to = function (transition, routes, params, query, callback) {
 
 module.exports = Transition;
 },{"./Cancellation":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Cancellation.js","./Redirect":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Redirect.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/actions/LocationActions.js":[function(require,module,exports){
-"use strict";
-
 /**
  * Actions that modify the URL.
  */
+'use strict';
+
 var LocationActions = {
 
   /**
    * Indicates a new location is being pushed to the history stack.
    */
-  PUSH: "push",
+  PUSH: 'push',
 
   /**
    * Indicates the current location should be replaced.
    */
-  REPLACE: "replace",
+  REPLACE: 'replace',
 
   /**
    * Indicates the most recent entry should be removed from the history stack.
    */
-  POP: "pop"
+  POP: 'pop'
 
 };
 
 module.exports = LocationActions;
 },{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/behaviors/ImitateBrowserBehavior.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var LocationActions = require("../actions/LocationActions");
+var LocationActions = require('../actions/LocationActions');
 
 /**
  * A scroll behavior that attempts to imitate the default behavior
@@ -15832,12 +16112,12 @@ var ImitateBrowserBehavior = {
 
 module.exports = ImitateBrowserBehavior;
 },{"../actions/LocationActions":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/actions/LocationActions.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/behaviors/ScrollToTopBehavior.js":[function(require,module,exports){
-"use strict";
-
 /**
  * A scroll behavior that always scrolls to the top of the page
  * after a transition.
  */
+"use strict";
+
 var ScrollToTopBehavior = {
 
   updateScrollPosition: function updateScrollPosition() {
@@ -15848,13 +16128,13 @@ var ScrollToTopBehavior = {
 
 module.exports = ScrollToTopBehavior;
 },{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/ContextWrapper.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var _createClass = (function () { function defineProperties(target, props) { for (var key in props) { var prop = props[key]; prop.configurable = true; if (prop.value) prop.writable = true; } Object.defineProperties(target, props); } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } };
 
-var _inherits = function (subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) subClass.__proto__ = superClass; };
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
-var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
+var _inherits = function (subClass, superClass) { if (typeof superClass !== 'function' && superClass !== null) { throw new TypeError('Super expression must either be null or a function, not ' + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) subClass.__proto__ = superClass; };
 
 /**
  * This component is necessary to get around a context warning
@@ -15862,7 +16142,7 @@ var _classCallCheck = function (instance, Constructor) { if (!(instance instance
  * between the "owner" and "parent" contexts.
  */
 
-var React = require("react");
+var React = require('react');
 
 var ContextWrapper = (function (_React$Component) {
   function ContextWrapper() {
@@ -15875,28 +16155,27 @@ var ContextWrapper = (function (_React$Component) {
 
   _inherits(ContextWrapper, _React$Component);
 
-  _createClass(ContextWrapper, {
-    render: {
-      value: function render() {
-        return this.props.children;
-      }
+  _createClass(ContextWrapper, [{
+    key: 'render',
+    value: function render() {
+      return this.props.children;
     }
-  });
+  }]);
 
   return ContextWrapper;
 })(React.Component);
 
 module.exports = ContextWrapper;
 },{"react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/DefaultRoute.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var _inherits = function (subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) subClass.__proto__ = superClass; };
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } };
 
-var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
+var _inherits = function (subClass, superClass) { if (typeof superClass !== 'function' && superClass !== null) { throw new TypeError('Super expression must either be null or a function, not ' + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) subClass.__proto__ = superClass; };
 
-var PropTypes = require("../PropTypes");
-var RouteHandler = require("./RouteHandler");
-var Route = require("./Route");
+var PropTypes = require('../PropTypes');
+var RouteHandler = require('./RouteHandler');
+var Route = require('./Route');
 
 /**
  * A <DefaultRoute> component is a special kind of <Route> that
@@ -15936,17 +16215,17 @@ DefaultRoute.defaultProps = {
 
 module.exports = DefaultRoute;
 },{"../PropTypes":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PropTypes.js","./Route":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/Route.js","./RouteHandler":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/RouteHandler.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/Link.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var _createClass = (function () { function defineProperties(target, props) { for (var key in props) { var prop = props[key]; prop.configurable = true; if (prop.value) prop.writable = true; } Object.defineProperties(target, props); } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } };
 
-var _inherits = function (subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) subClass.__proto__ = superClass; };
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
-var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
+var _inherits = function (subClass, superClass) { if (typeof superClass !== 'function' && superClass !== null) { throw new TypeError('Super expression must either be null or a function, not ' + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) subClass.__proto__ = superClass; };
 
-var React = require("react");
-var assign = require("react/lib/Object.assign");
-var PropTypes = require("../PropTypes");
+var React = require('react');
+var assign = require('react/lib/Object.assign');
+var PropTypes = require('../PropTypes');
 
 function isLeftClickEvent(event) {
   return event.button === 0;
@@ -15986,67 +16265,64 @@ var Link = (function (_React$Component) {
 
   _inherits(Link, _React$Component);
 
-  _createClass(Link, {
-    handleClick: {
-      value: function handleClick(event) {
-        var allowTransition = true;
-        var clickResult;
+  _createClass(Link, [{
+    key: 'handleClick',
+    value: function handleClick(event) {
+      var allowTransition = true;
+      var clickResult;
 
-        if (this.props.onClick) clickResult = this.props.onClick(event);
+      if (this.props.onClick) clickResult = this.props.onClick(event);
 
-        if (isModifiedEvent(event) || !isLeftClickEvent(event)) {
-          return;
-        }if (clickResult === false || event.defaultPrevented === true) allowTransition = false;
+      if (isModifiedEvent(event) || !isLeftClickEvent(event)) {
+        return;
+      }if (clickResult === false || event.defaultPrevented === true) allowTransition = false;
 
-        event.preventDefault();
+      event.preventDefault();
 
-        if (allowTransition) this.context.router.transitionTo(this.props.to, this.props.params, this.props.query);
-      }
-    },
-    getHref: {
-
-      /**
-       * Returns the value of the "href" attribute to use on the DOM element.
-       */
-
-      value: function getHref() {
-        return this.context.router.makeHref(this.props.to, this.props.params, this.props.query);
-      }
-    },
-    getClassName: {
-
-      /**
-       * Returns the value of the "class" attribute to use on the DOM element, which contains
-       * the value of the activeClassName property when this <Link> is active.
-       */
-
-      value: function getClassName() {
-        var className = this.props.className;
-
-        if (this.getActiveState()) className += " " + this.props.activeClassName;
-
-        return className;
-      }
-    },
-    getActiveState: {
-      value: function getActiveState() {
-        return this.context.router.isActive(this.props.to, this.props.params, this.props.query);
-      }
-    },
-    render: {
-      value: function render() {
-        var props = assign({}, this.props, {
-          href: this.getHref(),
-          className: this.getClassName(),
-          onClick: this.handleClick.bind(this)
-        });
-
-        if (props.activeStyle && this.getActiveState()) props.style = props.activeStyle;
-
-        return React.DOM.a(props, this.props.children);
-      }
+      if (allowTransition) this.context.router.transitionTo(this.props.to, this.props.params, this.props.query);
     }
-  });
+  }, {
+    key: 'getHref',
+
+    /**
+     * Returns the value of the "href" attribute to use on the DOM element.
+     */
+    value: function getHref() {
+      return this.context.router.makeHref(this.props.to, this.props.params, this.props.query);
+    }
+  }, {
+    key: 'getClassName',
+
+    /**
+     * Returns the value of the "class" attribute to use on the DOM element, which contains
+     * the value of the activeClassName property when this <Link> is active.
+     */
+    value: function getClassName() {
+      var className = this.props.className;
+
+      if (this.getActiveState()) className += ' ' + this.props.activeClassName;
+
+      return className;
+    }
+  }, {
+    key: 'getActiveState',
+    value: function getActiveState() {
+      return this.context.router.isActive(this.props.to, this.props.params, this.props.query);
+    }
+  }, {
+    key: 'render',
+    value: function render() {
+      var props = assign({}, this.props, {
+        href: this.getHref(),
+        className: this.getClassName(),
+        onClick: this.handleClick.bind(this)
+      });
+
+      if (props.activeStyle && this.getActiveState()) props.style = props.activeStyle;
+
+      return React.DOM.a(props, this.props.children);
+    }
+  }]);
 
   return Link;
 })(React.Component);
@@ -16069,21 +16345,21 @@ Link.propTypes = {
 };
 
 Link.defaultProps = {
-  activeClassName: "active",
-  className: ""
+  activeClassName: 'active',
+  className: ''
 };
 
 module.exports = Link;
 },{"../PropTypes":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PropTypes.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react/lib/Object.assign":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/Object.assign.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/NotFoundRoute.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var _inherits = function (subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) subClass.__proto__ = superClass; };
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } };
 
-var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
+var _inherits = function (subClass, superClass) { if (typeof superClass !== 'function' && superClass !== null) { throw new TypeError('Super expression must either be null or a function, not ' + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) subClass.__proto__ = superClass; };
 
-var PropTypes = require("../PropTypes");
-var RouteHandler = require("./RouteHandler");
-var Route = require("./Route");
+var PropTypes = require('../PropTypes');
+var RouteHandler = require('./RouteHandler');
+var Route = require('./Route');
 
 /**
  * A <NotFoundRoute> is a special kind of <Route> that
@@ -16124,14 +16400,14 @@ NotFoundRoute.defaultProps = {
 
 module.exports = NotFoundRoute;
 },{"../PropTypes":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PropTypes.js","./Route":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/Route.js","./RouteHandler":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/RouteHandler.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/Redirect.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var _inherits = function (subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) subClass.__proto__ = superClass; };
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } };
 
-var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
+var _inherits = function (subClass, superClass) { if (typeof superClass !== 'function' && superClass !== null) { throw new TypeError('Super expression must either be null or a function, not ' + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) subClass.__proto__ = superClass; };
 
-var PropTypes = require("../PropTypes");
-var Route = require("./Route");
+var PropTypes = require('../PropTypes');
+var Route = require('./Route');
 
 /**
  * A <Redirect> component is a special kind of <Route> that always
@@ -16168,18 +16444,18 @@ Redirect.defaultProps = {};
 
 module.exports = Redirect;
 },{"../PropTypes":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PropTypes.js","./Route":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/Route.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/Route.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var _createClass = (function () { function defineProperties(target, props) { for (var key in props) { var prop = props[key]; prop.configurable = true; if (prop.value) prop.writable = true; } Object.defineProperties(target, props); } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } };
 
-var _inherits = function (subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) subClass.__proto__ = superClass; };
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
-var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
+var _inherits = function (subClass, superClass) { if (typeof superClass !== 'function' && superClass !== null) { throw new TypeError('Super expression must either be null or a function, not ' + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) subClass.__proto__ = superClass; };
 
-var React = require("react");
-var invariant = require("react/lib/invariant");
-var PropTypes = require("../PropTypes");
-var RouteHandler = require("./RouteHandler");
+var React = require('react');
+var invariant = require('react/lib/invariant');
+var PropTypes = require('../PropTypes');
+var RouteHandler = require('./RouteHandler');
 
 /**
  * <Route> components specify components that are rendered to the page when the
@@ -16233,13 +16509,12 @@ var Route = (function (_React$Component) {
 
   _inherits(Route, _React$Component);
 
-  _createClass(Route, {
-    render: {
-      value: function render() {
-        invariant(false, "%s elements are for router configuration only and should not be rendered", this.constructor.name);
-      }
+  _createClass(Route, [{
+    key: 'render',
+    value: function render() {
+      invariant(false, '%s elements are for router configuration only and should not be rendered', this.constructor.name);
     }
-  });
+  }]);
 
   return Route;
 })(React.Component);
@@ -16261,20 +16536,20 @@ Route.defaultProps = {
 
 module.exports = Route;
 },{"../PropTypes":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PropTypes.js","./RouteHandler":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/RouteHandler.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react/lib/invariant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/invariant.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/RouteHandler.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var _createClass = (function () { function defineProperties(target, props) { for (var key in props) { var prop = props[key]; prop.configurable = true; if (prop.value) prop.writable = true; } Object.defineProperties(target, props); } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } };
 
-var _inherits = function (subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) subClass.__proto__ = superClass; };
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
-var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
+var _inherits = function (subClass, superClass) { if (typeof superClass !== 'function' && superClass !== null) { throw new TypeError('Super expression must either be null or a function, not ' + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) subClass.__proto__ = superClass; };
 
-var React = require("react");
-var ContextWrapper = require("./ContextWrapper");
-var assign = require("react/lib/Object.assign");
-var PropTypes = require("../PropTypes");
+var React = require('react');
+var ContextWrapper = require('./ContextWrapper');
+var assign = require('react/lib/Object.assign');
+var PropTypes = require('../PropTypes');
 
-var REF_NAME = "__routeHandler__";
+var REF_NAME = '__routeHandler__';
 
 /**
  * A <RouteHandler> component renders the active child route handler
@@ -16292,57 +16567,65 @@ var RouteHandler = (function (_React$Component) {
 
   _inherits(RouteHandler, _React$Component);
 
-  _createClass(RouteHandler, {
-    getChildContext: {
-      value: function getChildContext() {
-        return {
-          routeDepth: this.context.routeDepth + 1
-        };
-      }
-    },
-    componentDidMount: {
-      value: function componentDidMount() {
-        this._updateRouteComponent(this.refs[REF_NAME]);
-      }
-    },
-    componentDidUpdate: {
-      value: function componentDidUpdate() {
-        this._updateRouteComponent(this.refs[REF_NAME]);
-      }
-    },
-    componentWillUnmount: {
-      value: function componentWillUnmount() {
-        this._updateRouteComponent(null);
-      }
-    },
-    _updateRouteComponent: {
-      value: function _updateRouteComponent(component) {
-        this.context.router.setRouteComponentAtDepth(this.getRouteDepth(), component);
-      }
-    },
-    getRouteDepth: {
-      value: function getRouteDepth() {
-        return this.context.routeDepth;
-      }
-    },
-    createChildRouteHandler: {
-      value: function createChildRouteHandler(props) {
-        var route = this.context.router.getRouteAtDepth(this.getRouteDepth());
-        return route ? React.createElement(route.handler, assign({}, props || this.props, { ref: REF_NAME })) : null;
-      }
-    },
-    render: {
-      value: function render() {
-        var handler = this.createChildRouteHandler();
-        // <script/> for things like <CSSTransitionGroup/> that don't like null
-        return handler ? React.createElement(
-          ContextWrapper,
-          null,
-          handler
-        ) : React.createElement("script", null);
-      }
+  _createClass(RouteHandler, [{
+    key: 'getChildContext',
+    value: function getChildContext() {
+      return {
+        routeDepth: this.context.routeDepth + 1
+      };
     }
-  });
+  }, {
+    key: 'componentDidMount',
+    value: function componentDidMount() {
+      this._updateRouteComponent(this.refs[REF_NAME]);
+    }
+  }, {
+    key: 'componentDidUpdate',
+    value: function componentDidUpdate() {
+      this._updateRouteComponent(this.refs[REF_NAME]);
+    }
+  }, {
+    key: 'componentWillUnmount',
+    value: function componentWillUnmount() {
+      this._updateRouteComponent(null);
+    }
+  }, {
+    key: '_updateRouteComponent',
+    value: function _updateRouteComponent(component) {
+      this.context.router.setRouteComponentAtDepth(this.getRouteDepth(), component);
+    }
+  }, {
+    key: 'getRouteDepth',
+    value: function getRouteDepth() {
+      return this.context.routeDepth;
+    }
+  }, {
+    key: 'createChildRouteHandler',
+    value: function createChildRouteHandler(props) {
+      var route = this.context.router.getRouteAtDepth(this.getRouteDepth());
+
+      if (route == null) {
+        return null;
+      }var childProps = assign({}, props || this.props, {
+        ref: REF_NAME,
+        params: this.context.router.getCurrentParams(),
+        query: this.context.router.getCurrentQuery()
+      });
+
+      return React.createElement(route.handler, childProps);
+    }
+  }, {
+    key: 'render',
+    value: function render() {
+      var handler = this.createChildRouteHandler();
+      // <script/> for things like <CSSTransitionGroup/> that don't like null
+      return handler ? React.createElement(
+        ContextWrapper,
+        null,
+        handler
+      ) : React.createElement('script', null);
+    }
+  }]);
 
   return RouteHandler;
 })(React.Component);
@@ -16363,36 +16646,36 @@ RouteHandler.childContextTypes = {
 module.exports = RouteHandler;
 },{"../PropTypes":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PropTypes.js","./ContextWrapper":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/ContextWrapper.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react/lib/Object.assign":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/Object.assign.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/createRouter.js":[function(require,module,exports){
 (function (process){
-"use strict";
-
 /* jshint -W058 */
-var React = require("react");
-var warning = require("react/lib/warning");
-var invariant = require("react/lib/invariant");
-var canUseDOM = require("react/lib/ExecutionEnvironment").canUseDOM;
-var LocationActions = require("./actions/LocationActions");
-var ImitateBrowserBehavior = require("./behaviors/ImitateBrowserBehavior");
-var HashLocation = require("./locations/HashLocation");
-var HistoryLocation = require("./locations/HistoryLocation");
-var RefreshLocation = require("./locations/RefreshLocation");
-var StaticLocation = require("./locations/StaticLocation");
-var ScrollHistory = require("./ScrollHistory");
-var createRoutesFromReactChildren = require("./createRoutesFromReactChildren");
-var isReactChildren = require("./isReactChildren");
-var Transition = require("./Transition");
-var PropTypes = require("./PropTypes");
-var Redirect = require("./Redirect");
-var History = require("./History");
-var Cancellation = require("./Cancellation");
-var Match = require("./Match");
-var Route = require("./Route");
-var supportsHistory = require("./supportsHistory");
-var PathUtils = require("./PathUtils");
+'use strict';
+
+var React = require('react');
+var warning = require('react/lib/warning');
+var invariant = require('react/lib/invariant');
+var canUseDOM = require('react/lib/ExecutionEnvironment').canUseDOM;
+var LocationActions = require('./actions/LocationActions');
+var ImitateBrowserBehavior = require('./behaviors/ImitateBrowserBehavior');
+var HashLocation = require('./locations/HashLocation');
+var HistoryLocation = require('./locations/HistoryLocation');
+var RefreshLocation = require('./locations/RefreshLocation');
+var StaticLocation = require('./locations/StaticLocation');
+var ScrollHistory = require('./ScrollHistory');
+var createRoutesFromReactChildren = require('./createRoutesFromReactChildren');
+var isReactChildren = require('./isReactChildren');
+var Transition = require('./Transition');
+var PropTypes = require('./PropTypes');
+var Redirect = require('./Redirect');
+var History = require('./History');
+var Cancellation = require('./Cancellation');
+var Match = require('./Match');
+var Route = require('./Route');
+var supportsHistory = require('./supportsHistory');
+var PathUtils = require('./PathUtils');
 
 /**
  * The default location for new routers.
  */
-var DEFAULT_LOCATION = canUseDOM ? HashLocation : "/";
+var DEFAULT_LOCATION = canUseDOM ? HashLocation : '/';
 
 /**
  * The default scroll behavior for new routers.
@@ -16430,7 +16713,7 @@ function addRoutesToNamedRoutes(routes, namedRoutes) {
     route = routes[i];
 
     if (route.name) {
-      invariant(namedRoutes[route.name] == null, "You may not have more than one route named \"%s\"", route.name);
+      invariant(namedRoutes[route.name] == null, 'You may not have more than one route named "%s"', route.name);
 
       namedRoutes[route.name] = route;
     }
@@ -16488,12 +16771,12 @@ function createRouter(options) {
   var pendingTransition = null;
   var dispatchHandler = null;
 
-  if (typeof location === "string") location = new StaticLocation(location);
+  if (typeof location === 'string') location = new StaticLocation(location);
 
   if (location instanceof StaticLocation) {
-    warning(!canUseDOM || process.env.NODE_ENV === "test", "You should not use a static location in a DOM environment because " + "the router will not be kept in sync with the current URL");
+    warning(!canUseDOM || process.env.NODE_ENV === 'test', 'You should not use a static location in a DOM environment because ' + 'the router will not be kept in sync with the current URL');
   } else {
-    invariant(canUseDOM || location.needsDOM === false, "You cannot use %s without a DOM", location);
+    invariant(canUseDOM || location.needsDOM === false, 'You cannot use %s without a DOM', location);
   }
 
   // Automatically fall back to full page refreshes in
@@ -16502,7 +16785,7 @@ function createRouter(options) {
 
   var Router = React.createClass({
 
-    displayName: "Router",
+    displayName: 'Router',
 
     statics: {
 
@@ -16561,7 +16844,7 @@ function createRouter(options) {
         } else {
           var route = to instanceof Route ? to : Router.namedRoutes[to];
 
-          invariant(route instanceof Route, "Cannot find a route named \"%s\"", to);
+          invariant(route instanceof Route, 'Cannot find a route named "%s"', to);
 
           path = route.path;
         }
@@ -16575,7 +16858,7 @@ function createRouter(options) {
        */
       makeHref: function makeHref(to, params, query) {
         var path = Router.makePath(to, params, query);
-        return location === HashLocation ? "#" + path : path;
+        return location === HashLocation ? '#' + path : path;
       },
 
       /**
@@ -16618,13 +16901,13 @@ function createRouter(options) {
           return true;
         }
 
-        warning(false, "goBack() was ignored because there is no router history");
+        warning(false, 'goBack() was ignored because there is no router history');
 
         return false;
       },
 
       handleAbort: options.onAbort || function (abortReason) {
-        if (location instanceof StaticLocation) throw new Error("Unhandled aborted transition! Reason: " + abortReason);
+        if (location instanceof StaticLocation) throw new Error('Unhandled aborted transition! Reason: ' + abortReason);
 
         if (abortReason instanceof Cancellation) {
           return;
@@ -16676,7 +16959,7 @@ function createRouter(options) {
 
         var match = Router.match(path);
 
-        warning(match != null, "No route matches path \"%s\". Make sure you have <Route path=\"%s\"> somewhere in your routes", path, path);
+        warning(match != null, 'No route matches path "%s". Make sure you have <Route path="%s"> somewhere in your routes', path, path);
 
         if (match == null) match = {};
 
@@ -16731,7 +17014,7 @@ function createRouter(options) {
        * Router.*Location objects (e.g. Router.HashLocation or Router.HistoryLocation).
        */
       run: function run(callback) {
-        invariant(!Router.isRunning, "Router is already running");
+        invariant(!Router.isRunning, 'Router is already running');
 
         dispatchHandler = function (error, transition, newState) {
           if (error) Router.handleError(error);
@@ -16879,19 +17162,19 @@ function createRouter(options) {
 module.exports = createRouter;
 }).call(this,require('_process'))
 },{"./Cancellation":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Cancellation.js","./History":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/History.js","./Match":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Match.js","./PathUtils":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PathUtils.js","./PropTypes":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/PropTypes.js","./Redirect":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Redirect.js","./Route":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Route.js","./ScrollHistory":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/ScrollHistory.js","./Transition":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Transition.js","./actions/LocationActions":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/actions/LocationActions.js","./behaviors/ImitateBrowserBehavior":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/behaviors/ImitateBrowserBehavior.js","./createRoutesFromReactChildren":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/createRoutesFromReactChildren.js","./isReactChildren":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/isReactChildren.js","./locations/HashLocation":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/HashLocation.js","./locations/HistoryLocation":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/HistoryLocation.js","./locations/RefreshLocation":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/RefreshLocation.js","./locations/StaticLocation":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/StaticLocation.js","./supportsHistory":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/supportsHistory.js","_process":"/Users/user/PhpstormProjects/careselector-admin/node_modules/browserify/node_modules/process/browser.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react/lib/ExecutionEnvironment":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/ExecutionEnvironment.js","react/lib/invariant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/invariant.js","react/lib/warning":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/warning.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/createRoutesFromReactChildren.js":[function(require,module,exports){
-"use strict";
-
 /* jshint -W084 */
-var React = require("react");
-var assign = require("react/lib/Object.assign");
-var warning = require("react/lib/warning");
-var DefaultRoute = require("./components/DefaultRoute");
-var NotFoundRoute = require("./components/NotFoundRoute");
-var Redirect = require("./components/Redirect");
-var Route = require("./Route");
+'use strict';
+
+var React = require('react');
+var assign = require('react/lib/Object.assign');
+var warning = require('react/lib/warning');
+var DefaultRoute = require('./components/DefaultRoute');
+var NotFoundRoute = require('./components/NotFoundRoute');
+var Redirect = require('./components/Redirect');
+var Route = require('./Route');
 
 function checkPropTypes(componentName, propTypes, props) {
-  componentName = componentName || "UnknownComponent";
+  componentName = componentName || 'UnknownComponent';
 
   for (var propName in propTypes) {
     if (propTypes.hasOwnProperty(propName)) {
@@ -16961,16 +17244,16 @@ function createRoutesFromReactChildren(children) {
 
 module.exports = createRoutesFromReactChildren;
 },{"./Route":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Route.js","./components/DefaultRoute":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/DefaultRoute.js","./components/NotFoundRoute":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/NotFoundRoute.js","./components/Redirect":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/Redirect.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react/lib/Object.assign":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/Object.assign.js","react/lib/warning":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/warning.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/getWindowScrollPosition.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var invariant = require("react/lib/invariant");
-var canUseDOM = require("react/lib/ExecutionEnvironment").canUseDOM;
+var invariant = require('react/lib/invariant');
+var canUseDOM = require('react/lib/ExecutionEnvironment').canUseDOM;
 
 /**
  * Returns the current scroll position of the window as { x, y }.
  */
 function getWindowScrollPosition() {
-  invariant(canUseDOM, "Cannot get current scroll position without a DOM");
+  invariant(canUseDOM, 'Cannot get current scroll position without a DOM');
 
   return {
     x: window.pageXOffset || document.documentElement.scrollLeft,
@@ -16980,39 +17263,41 @@ function getWindowScrollPosition() {
 
 module.exports = getWindowScrollPosition;
 },{"react/lib/ExecutionEnvironment":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/ExecutionEnvironment.js","react/lib/invariant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/invariant.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/index.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-exports.DefaultRoute = require("./components/DefaultRoute");
-exports.Link = require("./components/Link");
-exports.NotFoundRoute = require("./components/NotFoundRoute");
-exports.Redirect = require("./components/Redirect");
-exports.Route = require("./components/Route");
-exports.RouteHandler = require("./components/RouteHandler");
+exports.DefaultRoute = require('./components/DefaultRoute');
+exports.Link = require('./components/Link');
+exports.NotFoundRoute = require('./components/NotFoundRoute');
+exports.Redirect = require('./components/Redirect');
+exports.Route = require('./components/Route');
+exports.ActiveHandler = require('./components/RouteHandler');
+exports.RouteHandler = exports.ActiveHandler;
 
-exports.HashLocation = require("./locations/HashLocation");
-exports.HistoryLocation = require("./locations/HistoryLocation");
-exports.RefreshLocation = require("./locations/RefreshLocation");
-exports.StaticLocation = require("./locations/StaticLocation");
-exports.TestLocation = require("./locations/TestLocation");
+exports.HashLocation = require('./locations/HashLocation');
+exports.HistoryLocation = require('./locations/HistoryLocation');
+exports.RefreshLocation = require('./locations/RefreshLocation');
+exports.StaticLocation = require('./locations/StaticLocation');
+exports.TestLocation = require('./locations/TestLocation');
 
-exports.ImitateBrowserBehavior = require("./behaviors/ImitateBrowserBehavior");
-exports.ScrollToTopBehavior = require("./behaviors/ScrollToTopBehavior");
+exports.ImitateBrowserBehavior = require('./behaviors/ImitateBrowserBehavior');
+exports.ScrollToTopBehavior = require('./behaviors/ScrollToTopBehavior');
 
-exports.History = require("./History");
-exports.Navigation = require("./Navigation");
-exports.State = require("./State");
+exports.History = require('./History');
+exports.Navigation = require('./Navigation');
+exports.State = require('./State');
 
-exports.createRoute = require("./Route").createRoute;
-exports.createDefaultRoute = require("./Route").createDefaultRoute;
-exports.createNotFoundRoute = require("./Route").createNotFoundRoute;
-exports.createRedirect = require("./Route").createRedirect;
-exports.createRoutesFromReactChildren = require("./createRoutesFromReactChildren");
-exports.create = require("./createRouter");
-exports.run = require("./runRouter");
+exports.createRoute = require('./Route').createRoute;
+exports.createDefaultRoute = require('./Route').createDefaultRoute;
+exports.createNotFoundRoute = require('./Route').createNotFoundRoute;
+exports.createRedirect = require('./Route').createRedirect;
+exports.createRoutesFromReactChildren = require('./createRoutesFromReactChildren');
+
+exports.create = require('./createRouter');
+exports.run = require('./runRouter');
 },{"./History":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/History.js","./Navigation":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Navigation.js","./Route":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/Route.js","./State":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/State.js","./behaviors/ImitateBrowserBehavior":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/behaviors/ImitateBrowserBehavior.js","./behaviors/ScrollToTopBehavior":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/behaviors/ScrollToTopBehavior.js","./components/DefaultRoute":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/DefaultRoute.js","./components/Link":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/Link.js","./components/NotFoundRoute":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/NotFoundRoute.js","./components/Redirect":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/Redirect.js","./components/Route":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/Route.js","./components/RouteHandler":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/components/RouteHandler.js","./createRouter":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/createRouter.js","./createRoutesFromReactChildren":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/createRoutesFromReactChildren.js","./locations/HashLocation":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/HashLocation.js","./locations/HistoryLocation":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/HistoryLocation.js","./locations/RefreshLocation":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/RefreshLocation.js","./locations/StaticLocation":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/StaticLocation.js","./locations/TestLocation":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/TestLocation.js","./runRouter":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/runRouter.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/isReactChildren.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var React = require("react");
+var React = require('react');
 
 function isValidChild(object) {
   return object == null || React.isValidElement(object);
@@ -17024,10 +17309,10 @@ function isReactChildren(object) {
 
 module.exports = isReactChildren;
 },{"react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/HashLocation.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var LocationActions = require("../actions/LocationActions");
-var History = require("../History");
+var LocationActions = require('../actions/LocationActions');
+var History = require('../History');
 
 var _listeners = [];
 var _isListening = false;
@@ -17049,9 +17334,9 @@ function notifyChange(type) {
 function ensureSlash() {
   var path = HashLocation.getCurrentPath();
 
-  if (path.charAt(0) === "/") {
+  if (path.charAt(0) === '/') {
     return true;
-  }HashLocation.replace("/" + path);
+  }HashLocation.replace('/' + path);
 
   return false;
 }
@@ -17081,9 +17366,9 @@ var HashLocation = {
 
     if (!_isListening) {
       if (window.addEventListener) {
-        window.addEventListener("hashchange", onHashChange, false);
+        window.addEventListener('hashchange', onHashChange, false);
       } else {
-        window.attachEvent("onhashchange", onHashChange);
+        window.attachEvent('onhashchange', onHashChange);
       }
 
       _isListening = true;
@@ -17097,9 +17382,9 @@ var HashLocation = {
 
     if (_listeners.length === 0) {
       if (window.removeEventListener) {
-        window.removeEventListener("hashchange", onHashChange, false);
+        window.removeEventListener('hashchange', onHashChange, false);
       } else {
-        window.removeEvent("onhashchange", onHashChange);
+        window.removeEvent('onhashchange', onHashChange);
       }
 
       _isListening = false;
@@ -17113,7 +17398,7 @@ var HashLocation = {
 
   replace: function replace(path) {
     _actionType = LocationActions.REPLACE;
-    window.location.replace(window.location.pathname + window.location.search + "#" + path);
+    window.location.replace(window.location.pathname + window.location.search + '#' + path);
   },
 
   pop: function pop() {
@@ -17125,21 +17410,21 @@ var HashLocation = {
     return decodeURI(
     // We can't use window.location.hash here because it's not
     // consistent across browsers - Firefox will pre-decode it!
-    window.location.href.split("#")[1] || "");
+    window.location.href.split('#')[1] || '');
   },
 
   toString: function toString() {
-    return "<HashLocation>";
+    return '<HashLocation>';
   }
 
 };
 
 module.exports = HashLocation;
 },{"../History":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/History.js","../actions/LocationActions":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/actions/LocationActions.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/HistoryLocation.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var LocationActions = require("../actions/LocationActions");
-var History = require("../History");
+var LocationActions = require('../actions/LocationActions');
+var History = require('../History');
 
 var _listeners = [];
 var _isListening = false;
@@ -17173,9 +17458,9 @@ var HistoryLocation = {
 
     if (!_isListening) {
       if (window.addEventListener) {
-        window.addEventListener("popstate", onPopState, false);
+        window.addEventListener('popstate', onPopState, false);
       } else {
-        window.attachEvent("onpopstate", onPopState);
+        window.attachEvent('onpopstate', onPopState);
       }
 
       _isListening = true;
@@ -17189,9 +17474,9 @@ var HistoryLocation = {
 
     if (_listeners.length === 0) {
       if (window.addEventListener) {
-        window.removeEventListener("popstate", onPopState, false);
+        window.removeEventListener('popstate', onPopState, false);
       } else {
-        window.removeEvent("onpopstate", onPopState);
+        window.removeEvent('onpopstate', onPopState);
       }
 
       _isListening = false;
@@ -17199,13 +17484,13 @@ var HistoryLocation = {
   },
 
   push: function push(path) {
-    window.history.pushState({ path: path }, "", path);
+    window.history.pushState({ path: path }, '', path);
     History.length += 1;
     notifyChange(LocationActions.PUSH);
   },
 
   replace: function replace(path) {
-    window.history.replaceState({ path: path }, "", path);
+    window.history.replaceState({ path: path }, '', path);
     notifyChange(LocationActions.REPLACE);
   },
 
@@ -17216,17 +17501,17 @@ var HistoryLocation = {
   },
 
   toString: function toString() {
-    return "<HistoryLocation>";
+    return '<HistoryLocation>';
   }
 
 };
 
 module.exports = HistoryLocation;
 },{"../History":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/History.js","../actions/LocationActions":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/actions/LocationActions.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/RefreshLocation.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var HistoryLocation = require("./HistoryLocation");
-var History = require("../History");
+var HistoryLocation = require('./HistoryLocation');
+var History = require('../History');
 
 /**
  * A Location that uses full page refreshes. This is used as
@@ -17248,23 +17533,23 @@ var RefreshLocation = {
   getCurrentPath: HistoryLocation.getCurrentPath,
 
   toString: function toString() {
-    return "<RefreshLocation>";
+    return '<RefreshLocation>';
   }
 
 };
 
 module.exports = RefreshLocation;
 },{"../History":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/History.js","./HistoryLocation":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/HistoryLocation.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/StaticLocation.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var _createClass = (function () { function defineProperties(target, props) { for (var key in props) { var prop = props[key]; prop.configurable = true; if (prop.value) prop.writable = true; } Object.defineProperties(target, props); } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } };
 
-var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
-var invariant = require("react/lib/invariant");
+var invariant = require('react/lib/invariant');
 
 function throwCannotModify() {
-  invariant(false, "You cannot modify a static location");
+  invariant(false, 'You cannot modify a static location');
 }
 
 /**
@@ -17280,18 +17565,17 @@ var StaticLocation = (function () {
     this.path = path;
   }
 
-  _createClass(StaticLocation, {
-    getCurrentPath: {
-      value: function getCurrentPath() {
-        return this.path;
-      }
-    },
-    toString: {
-      value: function toString() {
-        return "<StaticLocation path=\"" + this.path + "\">";
-      }
+  _createClass(StaticLocation, [{
+    key: 'getCurrentPath',
+    value: function getCurrentPath() {
+      return this.path;
     }
-  });
+  }, {
+    key: 'toString',
+    value: function toString() {
+      return '<StaticLocation path="' + this.path + '">';
+    }
+  }]);
 
   return StaticLocation;
 })();
@@ -17306,15 +17590,15 @@ StaticLocation.prototype.pop = throwCannotModify;
 
 module.exports = StaticLocation;
 },{"react/lib/invariant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/invariant.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/locations/TestLocation.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var _createClass = (function () { function defineProperties(target, props) { for (var key in props) { var prop = props[key]; prop.configurable = true; if (prop.value) prop.writable = true; } Object.defineProperties(target, props); } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
+var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError('Cannot call a class as a function'); } };
 
-var _classCallCheck = function (instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } };
+var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ('value' in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
-var invariant = require("react/lib/invariant");
-var LocationActions = require("../actions/LocationActions");
-var History = require("../History");
+var invariant = require('react/lib/invariant');
+var LocationActions = require('../actions/LocationActions');
+var History = require('../History');
 
 /**
  * A location that is convenient for testing and does not require a DOM.
@@ -17329,82 +17613,81 @@ var TestLocation = (function () {
     this._updateHistoryLength();
   }
 
-  _createClass(TestLocation, {
-    needsDOM: {
-      get: function () {
-        return false;
-      }
-    },
-    _updateHistoryLength: {
-      value: function _updateHistoryLength() {
-        History.length = this.history.length;
-      }
-    },
-    _notifyChange: {
-      value: function _notifyChange(type) {
-        var change = {
-          path: this.getCurrentPath(),
-          type: type
-        };
-
-        for (var i = 0, len = this.listeners.length; i < len; ++i) this.listeners[i].call(this, change);
-      }
-    },
-    addChangeListener: {
-      value: function addChangeListener(listener) {
-        this.listeners.push(listener);
-      }
-    },
-    removeChangeListener: {
-      value: function removeChangeListener(listener) {
-        this.listeners = this.listeners.filter(function (l) {
-          return l !== listener;
-        });
-      }
-    },
-    push: {
-      value: function push(path) {
-        this.history.push(path);
-        this._updateHistoryLength();
-        this._notifyChange(LocationActions.PUSH);
-      }
-    },
-    replace: {
-      value: function replace(path) {
-        invariant(this.history.length, "You cannot replace the current path with no history");
-
-        this.history[this.history.length - 1] = path;
-
-        this._notifyChange(LocationActions.REPLACE);
-      }
-    },
-    pop: {
-      value: function pop() {
-        this.history.pop();
-        this._updateHistoryLength();
-        this._notifyChange(LocationActions.POP);
-      }
-    },
-    getCurrentPath: {
-      value: function getCurrentPath() {
-        return this.history[this.history.length - 1];
-      }
-    },
-    toString: {
-      value: function toString() {
-        return "<TestLocation>";
-      }
+  _createClass(TestLocation, [{
+    key: 'needsDOM',
+    get: function () {
+      return false;
     }
-  });
+  }, {
+    key: '_updateHistoryLength',
+    value: function _updateHistoryLength() {
+      History.length = this.history.length;
+    }
+  }, {
+    key: '_notifyChange',
+    value: function _notifyChange(type) {
+      var change = {
+        path: this.getCurrentPath(),
+        type: type
+      };
+
+      for (var i = 0, len = this.listeners.length; i < len; ++i) this.listeners[i].call(this, change);
+    }
+  }, {
+    key: 'addChangeListener',
+    value: function addChangeListener(listener) {
+      this.listeners.push(listener);
+    }
+  }, {
+    key: 'removeChangeListener',
+    value: function removeChangeListener(listener) {
+      this.listeners = this.listeners.filter(function (l) {
+        return l !== listener;
+      });
+    }
+  }, {
+    key: 'push',
+    value: function push(path) {
+      this.history.push(path);
+      this._updateHistoryLength();
+      this._notifyChange(LocationActions.PUSH);
+    }
+  }, {
+    key: 'replace',
+    value: function replace(path) {
+      invariant(this.history.length, 'You cannot replace the current path with no history');
+
+      this.history[this.history.length - 1] = path;
+
+      this._notifyChange(LocationActions.REPLACE);
+    }
+  }, {
+    key: 'pop',
+    value: function pop() {
+      this.history.pop();
+      this._updateHistoryLength();
+      this._notifyChange(LocationActions.POP);
+    }
+  }, {
+    key: 'getCurrentPath',
+    value: function getCurrentPath() {
+      return this.history[this.history.length - 1];
+    }
+  }, {
+    key: 'toString',
+    value: function toString() {
+      return '<TestLocation>';
+    }
+  }]);
 
   return TestLocation;
 })();
 
 module.exports = TestLocation;
 },{"../History":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/History.js","../actions/LocationActions":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/actions/LocationActions.js","react/lib/invariant":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/invariant.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/runRouter.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
-var createRouter = require("./createRouter");
+var createRouter = require('./createRouter');
 
 /**
  * A high-level convenience method that creates, configures, and
@@ -17436,7 +17719,7 @@ var createRouter = require("./createRouter");
  *   });
  */
 function runRouter(routes, location, callback) {
-  if (typeof location === "function") {
+  if (typeof location === 'function') {
     callback = location;
     location = null;
   }
@@ -17453,7 +17736,7 @@ function runRouter(routes, location, callback) {
 
 module.exports = runRouter;
 },{"./createRouter":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/createRouter.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-router/lib/supportsHistory.js":[function(require,module,exports){
-"use strict";
+'use strict';
 
 function supportsHistory() {
   /*! taken from modernizr
@@ -17462,10 +17745,10 @@ function supportsHistory() {
    * changed to avoid false negatives for Windows Phones: https://github.com/rackt/react-router/issues/586
    */
   var ua = navigator.userAgent;
-  if ((ua.indexOf("Android 2.") !== -1 || ua.indexOf("Android 4.0") !== -1) && ua.indexOf("Mobile Safari") !== -1 && ua.indexOf("Chrome") === -1 && ua.indexOf("Windows Phone") === -1) {
+  if ((ua.indexOf('Android 2.') !== -1 || ua.indexOf('Android 4.0') !== -1) && ua.indexOf('Mobile Safari') !== -1 && ua.indexOf('Chrome') === -1 && ua.indexOf('Windows Phone') === -1) {
     return false;
   }
-  return window.history && "pushState" in window.history;
+  return window.history && 'pushState' in window.history;
 }
 
 module.exports = supportsHistory;
@@ -17913,6 +18196,861 @@ exports.isBuffer = function (obj) {
         obj.constructor.isBuffer(obj));
 };
 
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/lib/components/TinyMCE.js":[function(require,module,exports){
+var React = require('react');
+var DOM = React.DOM;
+var isEqual = require('lodash/lang/isEqual');
+var uuid = require('../helpers/uuid');
+var uc_first = require('../helpers/uc_first');
+
+// Include all of the Native DOM and custom events from:
+// https://github.com/tinymce/tinymce/blob/master/tools/docs/tinymce.Editor.js#L5-L12
+var EVENTS = [
+  'focusin', 'focusout', 'click', 'dblclick', 'mousedown', 'mouseup',
+  'mousemove', 'mouseover', 'beforepaste', 'paste', 'cut', 'copy',
+  'selectionchange', 'mouseout', 'mouseenter', 'mouseleave', 'keydown',
+  'keypress', 'keyup', 'contextmenu', 'dragend', 'dragover', 'draggesture',
+  'dragdrop', 'drop', 'drag', 'BeforeRenderUI', 'SetAttrib', 'PreInit',
+  'PostRender', 'init', 'deactivate', 'activate', 'NodeChange',
+  'BeforeExecCommand', 'ExecCommand', 'show', 'hide', 'ProgressState',
+  'LoadContent', 'SaveContent', 'BeforeSetContent', 'SetContent',
+  'BeforeGetContent', 'GetContent', 'VisualAid', 'remove', 'submit', 'reset',
+  'BeforeAddUndo', 'AddUndo', 'change', 'undo', 'redo', 'ClearUndos',
+  'ObjectSelected', 'ObjectResizeStart', 'ObjectResized', 'PreProcess',
+  'PostProcess', 'focus', 'blur'
+];
+
+// Note: because the capitalization of the events is weird, we're going to get
+// some inconsistently-named handlers, for example compare:
+// 'onMouseleave' and 'onNodeChange'
+var HANDLER_NAMES = EVENTS.map(function(event) {
+  return 'on' + uc_first(event);
+});
+
+var TinyMCE = React.createClass({
+  displayName: 'TinyMCE',
+
+  propTypes: {
+    config: React.PropTypes.object,
+    content: React.PropTypes.string,
+  },
+
+  getDefaultProps: function () {
+    return {
+      config: {},
+      content: ''
+    };
+  },
+
+  componentWillMount: function () {
+    this.id = this.id || uuid();
+  },
+
+  componentDidMount: function () {
+    this._init(this.props.config);
+  },
+
+  componentWillUnmount: function () {
+    this._remove();
+  },
+
+  componentWillReceiveProps: function (nextProps) {
+    if (!isEqual(this.props.config, nextProps.config)) {
+      this._init(nextProps.config);
+    }
+  },
+
+  shouldComponentUpdate: function (nextProps, nextState) {
+    return (
+      !isEqual(this.props.content, nextProps.content) ||
+      !isEqual(this.props.config, nextProps.config)
+    );
+  },
+
+  _init: function (config) {
+    if (this._isInit) {
+      this._remove();
+    }
+
+    var self = this;
+    config.selector = '#' + this.id;
+    config.setup = function (editor) {
+      EVENTS.forEach(function (event, index) {
+        var handler = self.props[HANDLER_NAMES[index]];
+        if (typeof handler !== 'function') return;
+        editor.on(event, function(e) {
+          // native DOM events don't have access to the editor so we pass it here
+          handler(e, editor);
+        });
+      });
+    };
+
+    tinymce.init(config);
+    this._isInit = true;
+  },
+
+  _remove: function () {
+    tinymce.EditorManager.execCommand("mceRemoveEditor", true, this.id);
+    this._isInit = false;
+  },
+
+  render: function () {
+    return DOM.textarea({
+      id: this.id,
+      defaultValue: this.props.content
+    });
+  }
+});
+
+//add handler propTypes
+HANDLER_NAMES.forEach(function (name) {
+  TinyMCE.propTypes[name] = React.PropTypes.func;
+});
+
+module.exports = TinyMCE;
+
+},{"../helpers/uc_first":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/lib/helpers/uc_first.js","../helpers/uuid":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/lib/helpers/uuid.js","lodash/lang/isEqual":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isEqual.js","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/lib/helpers/uc_first.js":[function(require,module,exports){
+module.exports = function uc_first(str) {
+  return str[0].toUpperCase() + str.substring(1);
+};
+
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/lib/helpers/uuid.js":[function(require,module,exports){
+var count = 0;
+module.exports = function uuid() {
+  return 'react-tinymce-' + count++;
+};
+
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/lib/main.js":[function(require,module,exports){
+module.exports = require('./components/TinyMCE');
+
+},{"./components/TinyMCE":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/lib/components/TinyMCE.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/arraySome.js":[function(require,module,exports){
+/**
+ * A specialized version of `_.some` for arrays without support for callback
+ * shorthands and `this` binding.
+ *
+ * @private
+ * @param {Array} array The array to iterate over.
+ * @param {Function} predicate The function invoked per iteration.
+ * @returns {boolean} Returns `true` if any element passes the predicate check,
+ *  else `false`.
+ */
+function arraySome(array, predicate) {
+  var index = -1,
+      length = array.length;
+
+  while (++index < length) {
+    if (predicate(array[index], index, array)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+module.exports = arraySome;
+
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/baseIsEqual.js":[function(require,module,exports){
+var baseIsEqualDeep = require('./baseIsEqualDeep'),
+    isObject = require('../lang/isObject'),
+    isObjectLike = require('./isObjectLike');
+
+/**
+ * The base implementation of `_.isEqual` without support for `this` binding
+ * `customizer` functions.
+ *
+ * @private
+ * @param {*} value The value to compare.
+ * @param {*} other The other value to compare.
+ * @param {Function} [customizer] The function to customize comparing values.
+ * @param {boolean} [isLoose] Specify performing partial comparisons.
+ * @param {Array} [stackA] Tracks traversed `value` objects.
+ * @param {Array} [stackB] Tracks traversed `other` objects.
+ * @returns {boolean} Returns `true` if the values are equivalent, else `false`.
+ */
+function baseIsEqual(value, other, customizer, isLoose, stackA, stackB) {
+  if (value === other) {
+    return true;
+  }
+  if (value == null || other == null || (!isObject(value) && !isObjectLike(other))) {
+    return value !== value && other !== other;
+  }
+  return baseIsEqualDeep(value, other, baseIsEqual, customizer, isLoose, stackA, stackB);
+}
+
+module.exports = baseIsEqual;
+
+},{"../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isObject.js","./baseIsEqualDeep":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/baseIsEqualDeep.js","./isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/baseIsEqualDeep.js":[function(require,module,exports){
+var equalArrays = require('./equalArrays'),
+    equalByTag = require('./equalByTag'),
+    equalObjects = require('./equalObjects'),
+    isArray = require('../lang/isArray'),
+    isTypedArray = require('../lang/isTypedArray');
+
+/** `Object#toString` result references. */
+var argsTag = '[object Arguments]',
+    arrayTag = '[object Array]',
+    objectTag = '[object Object]';
+
+/** Used for native method references. */
+var objectProto = Object.prototype;
+
+/** Used to check objects for own properties. */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/**
+ * Used to resolve the [`toStringTag`](https://people.mozilla.org/~jorendorff/es6-draft.html#sec-object.prototype.tostring)
+ * of values.
+ */
+var objToString = objectProto.toString;
+
+/**
+ * A specialized version of `baseIsEqual` for arrays and objects which performs
+ * deep comparisons and tracks traversed objects enabling objects with circular
+ * references to be compared.
+ *
+ * @private
+ * @param {Object} object The object to compare.
+ * @param {Object} other The other object to compare.
+ * @param {Function} equalFunc The function to determine equivalents of values.
+ * @param {Function} [customizer] The function to customize comparing objects.
+ * @param {boolean} [isLoose] Specify performing partial comparisons.
+ * @param {Array} [stackA=[]] Tracks traversed `value` objects.
+ * @param {Array} [stackB=[]] Tracks traversed `other` objects.
+ * @returns {boolean} Returns `true` if the objects are equivalent, else `false`.
+ */
+function baseIsEqualDeep(object, other, equalFunc, customizer, isLoose, stackA, stackB) {
+  var objIsArr = isArray(object),
+      othIsArr = isArray(other),
+      objTag = arrayTag,
+      othTag = arrayTag;
+
+  if (!objIsArr) {
+    objTag = objToString.call(object);
+    if (objTag == argsTag) {
+      objTag = objectTag;
+    } else if (objTag != objectTag) {
+      objIsArr = isTypedArray(object);
+    }
+  }
+  if (!othIsArr) {
+    othTag = objToString.call(other);
+    if (othTag == argsTag) {
+      othTag = objectTag;
+    } else if (othTag != objectTag) {
+      othIsArr = isTypedArray(other);
+    }
+  }
+  var objIsObj = objTag == objectTag,
+      othIsObj = othTag == objectTag,
+      isSameTag = objTag == othTag;
+
+  if (isSameTag && !(objIsArr || objIsObj)) {
+    return equalByTag(object, other, objTag);
+  }
+  if (!isLoose) {
+    var objIsWrapped = objIsObj && hasOwnProperty.call(object, '__wrapped__'),
+        othIsWrapped = othIsObj && hasOwnProperty.call(other, '__wrapped__');
+
+    if (objIsWrapped || othIsWrapped) {
+      return equalFunc(objIsWrapped ? object.value() : object, othIsWrapped ? other.value() : other, customizer, isLoose, stackA, stackB);
+    }
+  }
+  if (!isSameTag) {
+    return false;
+  }
+  // Assume cyclic values are equal.
+  // For more information on detecting circular references see https://es5.github.io/#JO.
+  stackA || (stackA = []);
+  stackB || (stackB = []);
+
+  var length = stackA.length;
+  while (length--) {
+    if (stackA[length] == object) {
+      return stackB[length] == other;
+    }
+  }
+  // Add `object` and `other` to the stack of traversed objects.
+  stackA.push(object);
+  stackB.push(other);
+
+  var result = (objIsArr ? equalArrays : equalObjects)(object, other, equalFunc, customizer, isLoose, stackA, stackB);
+
+  stackA.pop();
+  stackB.pop();
+
+  return result;
+}
+
+module.exports = baseIsEqualDeep;
+
+},{"../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isArray.js","../lang/isTypedArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isTypedArray.js","./equalArrays":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/equalArrays.js","./equalByTag":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/equalByTag.js","./equalObjects":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/equalObjects.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/baseProperty.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/baseProperty.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/baseToString.js":[function(require,module,exports){
+/**
+ * Converts `value` to a string if it's not one. An empty string is returned
+ * for `null` or `undefined` values.
+ *
+ * @private
+ * @param {*} value The value to process.
+ * @returns {string} Returns the string.
+ */
+function baseToString(value) {
+  if (typeof value == 'string') {
+    return value;
+  }
+  return value == null ? '' : (value + '');
+}
+
+module.exports = baseToString;
+
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/bindCallback.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/bindCallback.js"][0].apply(exports,arguments)
+},{"../utility/identity":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/utility/identity.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/equalArrays.js":[function(require,module,exports){
+var arraySome = require('./arraySome');
+
+/**
+ * A specialized version of `baseIsEqualDeep` for arrays with support for
+ * partial deep comparisons.
+ *
+ * @private
+ * @param {Array} array The array to compare.
+ * @param {Array} other The other array to compare.
+ * @param {Function} equalFunc The function to determine equivalents of values.
+ * @param {Function} [customizer] The function to customize comparing arrays.
+ * @param {boolean} [isLoose] Specify performing partial comparisons.
+ * @param {Array} [stackA] Tracks traversed `value` objects.
+ * @param {Array} [stackB] Tracks traversed `other` objects.
+ * @returns {boolean} Returns `true` if the arrays are equivalent, else `false`.
+ */
+function equalArrays(array, other, equalFunc, customizer, isLoose, stackA, stackB) {
+  var index = -1,
+      arrLength = array.length,
+      othLength = other.length;
+
+  if (arrLength != othLength && !(isLoose && othLength > arrLength)) {
+    return false;
+  }
+  // Ignore non-index properties.
+  while (++index < arrLength) {
+    var arrValue = array[index],
+        othValue = other[index],
+        result = customizer ? customizer(isLoose ? othValue : arrValue, isLoose ? arrValue : othValue, index) : undefined;
+
+    if (result !== undefined) {
+      if (result) {
+        continue;
+      }
+      return false;
+    }
+    // Recursively compare arrays (susceptible to call stack limits).
+    if (isLoose) {
+      if (!arraySome(other, function(othValue) {
+            return arrValue === othValue || equalFunc(arrValue, othValue, customizer, isLoose, stackA, stackB);
+          })) {
+        return false;
+      }
+    } else if (!(arrValue === othValue || equalFunc(arrValue, othValue, customizer, isLoose, stackA, stackB))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+module.exports = equalArrays;
+
+},{"./arraySome":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/arraySome.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/equalByTag.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/equalByTag.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/equalObjects.js":[function(require,module,exports){
+var keys = require('../object/keys');
+
+/** Used for native method references. */
+var objectProto = Object.prototype;
+
+/** Used to check objects for own properties. */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/**
+ * A specialized version of `baseIsEqualDeep` for objects with support for
+ * partial deep comparisons.
+ *
+ * @private
+ * @param {Object} object The object to compare.
+ * @param {Object} other The other object to compare.
+ * @param {Function} equalFunc The function to determine equivalents of values.
+ * @param {Function} [customizer] The function to customize comparing values.
+ * @param {boolean} [isLoose] Specify performing partial comparisons.
+ * @param {Array} [stackA] Tracks traversed `value` objects.
+ * @param {Array} [stackB] Tracks traversed `other` objects.
+ * @returns {boolean} Returns `true` if the objects are equivalent, else `false`.
+ */
+function equalObjects(object, other, equalFunc, customizer, isLoose, stackA, stackB) {
+  var objProps = keys(object),
+      objLength = objProps.length,
+      othProps = keys(other),
+      othLength = othProps.length;
+
+  if (objLength != othLength && !isLoose) {
+    return false;
+  }
+  var index = objLength;
+  while (index--) {
+    var key = objProps[index];
+    if (!(isLoose ? key in other : hasOwnProperty.call(other, key))) {
+      return false;
+    }
+  }
+  var skipCtor = isLoose;
+  while (++index < objLength) {
+    key = objProps[index];
+    var objValue = object[key],
+        othValue = other[key],
+        result = customizer ? customizer(isLoose ? othValue : objValue, isLoose? objValue : othValue, key) : undefined;
+
+    // Recursively compare objects (susceptible to call stack limits).
+    if (!(result === undefined ? equalFunc(objValue, othValue, customizer, isLoose, stackA, stackB) : result)) {
+      return false;
+    }
+    skipCtor || (skipCtor = key == 'constructor');
+  }
+  if (!skipCtor) {
+    var objCtor = object.constructor,
+        othCtor = other.constructor;
+
+    // Non `Object` object instances with different constructors are not equal.
+    if (objCtor != othCtor &&
+        ('constructor' in object && 'constructor' in other) &&
+        !(typeof objCtor == 'function' && objCtor instanceof objCtor &&
+          typeof othCtor == 'function' && othCtor instanceof othCtor)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+module.exports = equalObjects;
+
+},{"../object/keys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/object/keys.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/getLength.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/getLength.js"][0].apply(exports,arguments)
+},{"./baseProperty":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/baseProperty.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/getNative.js":[function(require,module,exports){
+var isNative = require('../lang/isNative');
+
+/**
+ * Gets the native function at `key` of `object`.
+ *
+ * @private
+ * @param {Object} object The object to query.
+ * @param {string} key The key of the method to get.
+ * @returns {*} Returns the function if it's native, else `undefined`.
+ */
+function getNative(object, key) {
+  var value = object == null ? undefined : object[key];
+  return isNative(value) ? value : undefined;
+}
+
+module.exports = getNative;
+
+},{"../lang/isNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isNative.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isArrayLike.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isArrayLike.js"][0].apply(exports,arguments)
+},{"./getLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/getLength.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isLength.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isIndex.js":[function(require,module,exports){
+/** Used to detect unsigned integer values. */
+var reIsUint = /^\d+$/;
+
+/**
+ * Used as the [maximum length](https://people.mozilla.org/~jorendorff/es6-draft.html#sec-number.max_safe_integer)
+ * of an array-like value.
+ */
+var MAX_SAFE_INTEGER = 9007199254740991;
+
+/**
+ * Checks if `value` is a valid array-like index.
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @param {number} [length=MAX_SAFE_INTEGER] The upper bounds of a valid index.
+ * @returns {boolean} Returns `true` if `value` is a valid index, else `false`.
+ */
+function isIndex(value, length) {
+  value = (typeof value == 'number' || reIsUint.test(value)) ? +value : -1;
+  length = length == null ? MAX_SAFE_INTEGER : length;
+  return value > -1 && value % 1 == 0 && value < length;
+}
+
+module.exports = isIndex;
+
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isLength.js":[function(require,module,exports){
+/**
+ * Used as the [maximum length](https://people.mozilla.org/~jorendorff/es6-draft.html#sec-number.max_safe_integer)
+ * of an array-like value.
+ */
+var MAX_SAFE_INTEGER = 9007199254740991;
+
+/**
+ * Checks if `value` is a valid array-like length.
+ *
+ * **Note:** This function is based on [`ToLength`](https://people.mozilla.org/~jorendorff/es6-draft.html#sec-tolength).
+ *
+ * @private
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a valid length, else `false`.
+ */
+function isLength(value) {
+  return typeof value == 'number' && value > -1 && value % 1 == 0 && value <= MAX_SAFE_INTEGER;
+}
+
+module.exports = isLength;
+
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isObjectLike.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/internal/isObjectLike.js"][0].apply(exports,arguments)
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/shimKeys.js":[function(require,module,exports){
+var isArguments = require('../lang/isArguments'),
+    isArray = require('../lang/isArray'),
+    isIndex = require('./isIndex'),
+    isLength = require('./isLength'),
+    keysIn = require('../object/keysIn');
+
+/** Used for native method references. */
+var objectProto = Object.prototype;
+
+/** Used to check objects for own properties. */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/**
+ * A fallback implementation of `Object.keys` which creates an array of the
+ * own enumerable property names of `object`.
+ *
+ * @private
+ * @param {Object} object The object to query.
+ * @returns {Array} Returns the array of property names.
+ */
+function shimKeys(object) {
+  var props = keysIn(object),
+      propsLength = props.length,
+      length = propsLength && object.length;
+
+  var allowIndexes = !!length && isLength(length) &&
+    (isArray(object) || isArguments(object));
+
+  var index = -1,
+      result = [];
+
+  while (++index < propsLength) {
+    var key = props[index];
+    if ((allowIndexes && isIndex(key, length)) || hasOwnProperty.call(object, key)) {
+      result.push(key);
+    }
+  }
+  return result;
+}
+
+module.exports = shimKeys;
+
+},{"../lang/isArguments":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isArguments.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isArray.js","../object/keysIn":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/object/keysIn.js","./isIndex":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isIndex.js","./isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isLength.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isArguments.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isArguments.js"][0].apply(exports,arguments)
+},{"../internal/isArrayLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isArrayLike.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isArray.js":[function(require,module,exports){
+var getNative = require('../internal/getNative'),
+    isLength = require('../internal/isLength'),
+    isObjectLike = require('../internal/isObjectLike');
+
+/** `Object#toString` result references. */
+var arrayTag = '[object Array]';
+
+/** Used for native method references. */
+var objectProto = Object.prototype;
+
+/**
+ * Used to resolve the [`toStringTag`](https://people.mozilla.org/~jorendorff/es6-draft.html#sec-object.prototype.tostring)
+ * of values.
+ */
+var objToString = objectProto.toString;
+
+/* Native method references for those with the same name as other `lodash` methods. */
+var nativeIsArray = getNative(Array, 'isArray');
+
+/**
+ * Checks if `value` is classified as an `Array` object.
+ *
+ * @static
+ * @memberOf _
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is correctly classified, else `false`.
+ * @example
+ *
+ * _.isArray([1, 2, 3]);
+ * // => true
+ *
+ * _.isArray(function() { return arguments; }());
+ * // => false
+ */
+var isArray = nativeIsArray || function(value) {
+  return isObjectLike(value) && isLength(value.length) && objToString.call(value) == arrayTag;
+};
+
+module.exports = isArray;
+
+},{"../internal/getNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/getNative.js","../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isLength.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isEqual.js":[function(require,module,exports){
+var baseIsEqual = require('../internal/baseIsEqual'),
+    bindCallback = require('../internal/bindCallback');
+
+/**
+ * Performs a deep comparison between two values to determine if they are
+ * equivalent. If `customizer` is provided it is invoked to compare values.
+ * If `customizer` returns `undefined` comparisons are handled by the method
+ * instead. The `customizer` is bound to `thisArg` and invoked with three
+ * arguments: (value, other [, index|key]).
+ *
+ * **Note:** This method supports comparing arrays, booleans, `Date` objects,
+ * numbers, `Object` objects, regexes, and strings. Objects are compared by
+ * their own, not inherited, enumerable properties. Functions and DOM nodes
+ * are **not** supported. Provide a customizer function to extend support
+ * for comparing other values.
+ *
+ * @static
+ * @memberOf _
+ * @alias eq
+ * @category Lang
+ * @param {*} value The value to compare.
+ * @param {*} other The other value to compare.
+ * @param {Function} [customizer] The function to customize value comparisons.
+ * @param {*} [thisArg] The `this` binding of `customizer`.
+ * @returns {boolean} Returns `true` if the values are equivalent, else `false`.
+ * @example
+ *
+ * var object = { 'user': 'fred' };
+ * var other = { 'user': 'fred' };
+ *
+ * object == other;
+ * // => false
+ *
+ * _.isEqual(object, other);
+ * // => true
+ *
+ * // using a customizer callback
+ * var array = ['hello', 'goodbye'];
+ * var other = ['hi', 'goodbye'];
+ *
+ * _.isEqual(array, other, function(value, other) {
+ *   if (_.every([value, other], RegExp.prototype.test, /^h(?:i|ello)$/)) {
+ *     return true;
+ *   }
+ * });
+ * // => true
+ */
+function isEqual(value, other, customizer, thisArg) {
+  customizer = typeof customizer == 'function' ? bindCallback(customizer, thisArg, 3) : undefined;
+  var result = customizer ? customizer(value, other) : undefined;
+  return  result === undefined ? baseIsEqual(value, other, customizer) : !!result;
+}
+
+module.exports = isEqual;
+
+},{"../internal/baseIsEqual":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/baseIsEqual.js","../internal/bindCallback":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/bindCallback.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isNative.js":[function(require,module,exports){
+var escapeRegExp = require('../string/escapeRegExp'),
+    isObjectLike = require('../internal/isObjectLike');
+
+/** `Object#toString` result references. */
+var funcTag = '[object Function]';
+
+/** Used to detect host constructors (Safari > 5). */
+var reIsHostCtor = /^\[object .+?Constructor\]$/;
+
+/** Used for native method references. */
+var objectProto = Object.prototype;
+
+/** Used to resolve the decompiled source of functions. */
+var fnToString = Function.prototype.toString;
+
+/** Used to check objects for own properties. */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/**
+ * Used to resolve the [`toStringTag`](https://people.mozilla.org/~jorendorff/es6-draft.html#sec-object.prototype.tostring)
+ * of values.
+ */
+var objToString = objectProto.toString;
+
+/** Used to detect if a method is native. */
+var reIsNative = RegExp('^' +
+  escapeRegExp(fnToString.call(hasOwnProperty))
+  .replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, '$1.*?') + '$'
+);
+
+/**
+ * Checks if `value` is a native function.
+ *
+ * @static
+ * @memberOf _
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is a native function, else `false`.
+ * @example
+ *
+ * _.isNative(Array.prototype.push);
+ * // => true
+ *
+ * _.isNative(_);
+ * // => false
+ */
+function isNative(value) {
+  if (value == null) {
+    return false;
+  }
+  if (objToString.call(value) == funcTag) {
+    return reIsNative.test(fnToString.call(value));
+  }
+  return isObjectLike(value) && reIsHostCtor.test(value);
+}
+
+module.exports = isNative;
+
+},{"../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isObjectLike.js","../string/escapeRegExp":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/string/escapeRegExp.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isObject.js":[function(require,module,exports){
+/**
+ * Checks if `value` is the [language type](https://es5.github.io/#x8) of `Object`.
+ * (e.g. arrays, functions, objects, regexes, `new Number(0)`, and `new String('')`)
+ *
+ * @static
+ * @memberOf _
+ * @category Lang
+ * @param {*} value The value to check.
+ * @returns {boolean} Returns `true` if `value` is an object, else `false`.
+ * @example
+ *
+ * _.isObject({});
+ * // => true
+ *
+ * _.isObject([1, 2, 3]);
+ * // => true
+ *
+ * _.isObject(1);
+ * // => false
+ */
+function isObject(value) {
+  // Avoid a V8 JIT bug in Chrome 19-20.
+  // See https://code.google.com/p/v8/issues/detail?id=2291 for more details.
+  var type = typeof value;
+  return !!value && (type == 'object' || type == 'function');
+}
+
+module.exports = isObject;
+
+},{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isTypedArray.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/lang/isTypedArray.js"][0].apply(exports,arguments)
+},{"../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isLength.js","../internal/isObjectLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isObjectLike.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/object/keys.js":[function(require,module,exports){
+var getNative = require('../internal/getNative'),
+    isArrayLike = require('../internal/isArrayLike'),
+    isObject = require('../lang/isObject'),
+    shimKeys = require('../internal/shimKeys');
+
+/* Native method references for those with the same name as other `lodash` methods. */
+var nativeKeys = getNative(Object, 'keys');
+
+/**
+ * Creates an array of the own enumerable property names of `object`.
+ *
+ * **Note:** Non-object values are coerced to objects. See the
+ * [ES spec](https://people.mozilla.org/~jorendorff/es6-draft.html#sec-object.keys)
+ * for more details.
+ *
+ * @static
+ * @memberOf _
+ * @category Object
+ * @param {Object} object The object to query.
+ * @returns {Array} Returns the array of property names.
+ * @example
+ *
+ * function Foo() {
+ *   this.a = 1;
+ *   this.b = 2;
+ * }
+ *
+ * Foo.prototype.c = 3;
+ *
+ * _.keys(new Foo);
+ * // => ['a', 'b'] (iteration order is not guaranteed)
+ *
+ * _.keys('hi');
+ * // => ['0', '1']
+ */
+var keys = !nativeKeys ? shimKeys : function(object) {
+  var Ctor = object == null ? null : object.constructor;
+  if ((typeof Ctor == 'function' && Ctor.prototype === object) ||
+      (typeof object != 'function' && isArrayLike(object))) {
+    return shimKeys(object);
+  }
+  return isObject(object) ? nativeKeys(object) : [];
+};
+
+module.exports = keys;
+
+},{"../internal/getNative":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/getNative.js","../internal/isArrayLike":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isArrayLike.js","../internal/shimKeys":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/shimKeys.js","../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/object/keysIn.js":[function(require,module,exports){
+var isArguments = require('../lang/isArguments'),
+    isArray = require('../lang/isArray'),
+    isIndex = require('../internal/isIndex'),
+    isLength = require('../internal/isLength'),
+    isObject = require('../lang/isObject');
+
+/** Used for native method references. */
+var objectProto = Object.prototype;
+
+/** Used to check objects for own properties. */
+var hasOwnProperty = objectProto.hasOwnProperty;
+
+/**
+ * Creates an array of the own and inherited enumerable property names of `object`.
+ *
+ * **Note:** Non-object values are coerced to objects.
+ *
+ * @static
+ * @memberOf _
+ * @category Object
+ * @param {Object} object The object to query.
+ * @returns {Array} Returns the array of property names.
+ * @example
+ *
+ * function Foo() {
+ *   this.a = 1;
+ *   this.b = 2;
+ * }
+ *
+ * Foo.prototype.c = 3;
+ *
+ * _.keysIn(new Foo);
+ * // => ['a', 'b', 'c'] (iteration order is not guaranteed)
+ */
+function keysIn(object) {
+  if (object == null) {
+    return [];
+  }
+  if (!isObject(object)) {
+    object = Object(object);
+  }
+  var length = object.length;
+  length = (length && isLength(length) &&
+    (isArray(object) || isArguments(object)) && length) || 0;
+
+  var Ctor = object.constructor,
+      index = -1,
+      isProto = typeof Ctor == 'function' && Ctor.prototype === object,
+      result = Array(length),
+      skipIndexes = length > 0;
+
+  while (++index < length) {
+    result[index] = (index + '');
+  }
+  for (var key in object) {
+    if (!(skipIndexes && isIndex(key, length)) &&
+        !(key == 'constructor' && (isProto || !hasOwnProperty.call(object, key)))) {
+      result.push(key);
+    }
+  }
+  return result;
+}
+
+module.exports = keysIn;
+
+},{"../internal/isIndex":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isIndex.js","../internal/isLength":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/isLength.js","../lang/isArguments":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isArguments.js","../lang/isArray":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isArray.js","../lang/isObject":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/lang/isObject.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/string/escapeRegExp.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/string/escapeRegExp.js"][0].apply(exports,arguments)
+},{"../internal/baseToString":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/internal/baseToString.js"}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/node_modules/lodash/utility/identity.js":[function(require,module,exports){
+arguments[4]["/Users/user/PhpstormProjects/careselector-admin/node_modules/Fluxxor/node_modules/lodash/utility/identity.js"][0].apply(exports,arguments)
 },{}],"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/AutoFocusMixin.js":[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -22221,7 +23359,7 @@ if ("production" !== process.env.NODE_ENV) {
       if (typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ === 'undefined') {
         console.debug(
           'Download the React DevTools for a better development experience: ' +
-          'http://fb.me/react-devtools'
+          'https://fb.me/react-devtools'
         );
       }
     }
@@ -22248,7 +23386,7 @@ if ("production" !== process.env.NODE_ENV) {
       if (!expectedFeatures[i]) {
         console.error(
           'One or more ES5 shim/shams expected by React are not available: ' +
-          'http://fb.me/react-warning-polyfills'
+          'https://fb.me/react-warning-polyfills'
         );
         break;
       }
@@ -22256,7 +23394,7 @@ if ("production" !== process.env.NODE_ENV) {
   }
 }
 
-React.version = '0.13.2';
+React.version = '0.13.3';
 
 module.exports = React;
 
@@ -23763,7 +24901,7 @@ var ReactClass = {
         ("production" !== process.env.NODE_ENV ? warning(
           this instanceof Constructor,
           'Something is calling a React component directly. Use a factory or ' +
-          'JSX instead. See: http://fb.me/react-legacyfactory'
+          'JSX instead. See: https://fb.me/react-legacyfactory'
         ) : null);
       }
 
@@ -23975,20 +25113,38 @@ ReactComponent.prototype.forceUpdate = function(callback) {
  */
 if ("production" !== process.env.NODE_ENV) {
   var deprecatedAPIs = {
-    getDOMNode: 'getDOMNode',
-    isMounted: 'isMounted',
-    replaceProps: 'replaceProps',
-    replaceState: 'replaceState',
-    setProps: 'setProps'
+    getDOMNode: [
+      'getDOMNode',
+      'Use React.findDOMNode(component) instead.'
+    ],
+    isMounted: [
+      'isMounted',
+      'Instead, make sure to clean up subscriptions and pending requests in ' +
+      'componentWillUnmount to prevent memory leaks.'
+    ],
+    replaceProps: [
+      'replaceProps',
+      'Instead, call React.render again at the top level.'
+    ],
+    replaceState: [
+      'replaceState',
+      'Refactor your code to use setState instead (see ' +
+      'https://github.com/facebook/react/issues/3236).'
+    ],
+    setProps: [
+      'setProps',
+      'Instead, call React.render again at the top level.'
+    ]
   };
-  var defineDeprecationWarning = function(methodName, displayName) {
+  var defineDeprecationWarning = function(methodName, info) {
     try {
       Object.defineProperty(ReactComponent.prototype, methodName, {
         get: function() {
           ("production" !== process.env.NODE_ENV ? warning(
             false,
-            '%s(...) is deprecated in plain JavaScript React classes.',
-            displayName
+            '%s(...) is deprecated in plain JavaScript React classes. %s',
+            info[0],
+            info[1]
           ) : null);
           return undefined;
         }
@@ -24337,6 +25493,7 @@ var ReactCompositeComponentMixin = {
     this._pendingReplaceState = false;
     this._pendingForceUpdate = false;
 
+    var childContext;
     var renderedElement;
 
     var previouslyMounting = ReactLifeCycle.currentlyMountingInstance;
@@ -24351,7 +25508,8 @@ var ReactCompositeComponentMixin = {
         }
       }
 
-      renderedElement = this._renderValidatedComponent();
+      childContext = this._getValidatedChildContext(context);
+      renderedElement = this._renderValidatedComponent(childContext);
     } finally {
       ReactLifeCycle.currentlyMountingInstance = previouslyMounting;
     }
@@ -24365,7 +25523,7 @@ var ReactCompositeComponentMixin = {
       this._renderedComponent,
       rootID,
       transaction,
-      this._processChildContext(context)
+      this._mergeChildContext(context, childContext)
     );
     if (inst.componentDidMount) {
       transaction.getReactMountReady().enqueue(inst.componentDidMount, inst);
@@ -24495,7 +25653,7 @@ var ReactCompositeComponentMixin = {
    * @return {object}
    * @private
    */
-  _processChildContext: function(currentContext) {
+  _getValidatedChildContext: function(currentContext) {
     var inst = this._instance;
     var childContext = inst.getChildContext && inst.getChildContext();
     if (childContext) {
@@ -24520,6 +25678,13 @@ var ReactCompositeComponentMixin = {
           name
         ) : invariant(name in inst.constructor.childContextTypes));
       }
+      return childContext;
+    }
+    return null;
+  },
+
+  _mergeChildContext: function(currentContext, childContext) {
+    if (childContext) {
       return assign({}, currentContext, childContext);
     }
     return currentContext;
@@ -24779,6 +25944,10 @@ var ReactCompositeComponentMixin = {
       return inst.state;
     }
 
+    if (replace && queue.length === 1) {
+      return queue[0];
+    }
+
     var nextState = assign({}, replace ? queue[0] : inst.state);
     for (var i = replace ? 1 : 0; i < queue.length; i++) {
       var partial = queue[i];
@@ -24848,13 +26017,14 @@ var ReactCompositeComponentMixin = {
   _updateRenderedComponent: function(transaction, context) {
     var prevComponentInstance = this._renderedComponent;
     var prevRenderedElement = prevComponentInstance._currentElement;
-    var nextRenderedElement = this._renderValidatedComponent();
+    var childContext = this._getValidatedChildContext();
+    var nextRenderedElement = this._renderValidatedComponent(childContext);
     if (shouldUpdateReactComponent(prevRenderedElement, nextRenderedElement)) {
       ReactReconciler.receiveComponent(
         prevComponentInstance,
         nextRenderedElement,
         transaction,
-        this._processChildContext(context)
+        this._mergeChildContext(context, childContext)
       );
     } else {
       // These two IDs are actually the same! But nothing should rely on that.
@@ -24870,7 +26040,7 @@ var ReactCompositeComponentMixin = {
         this._renderedComponent,
         thisID,
         transaction,
-        this._processChildContext(context)
+        this._mergeChildContext(context, childContext)
       );
       this._replaceNodeWithMarkupByID(prevComponentID, nextMarkup);
     }
@@ -24908,11 +26078,12 @@ var ReactCompositeComponentMixin = {
   /**
    * @private
    */
-  _renderValidatedComponent: function() {
+  _renderValidatedComponent: function(childContext) {
     var renderedComponent;
     var previousContext = ReactContext.current;
-    ReactContext.current = this._processChildContext(
-      this._currentElement._context
+    ReactContext.current = this._mergeChildContext(
+      this._currentElement._context,
+      childContext
     );
     ReactCurrentOwner.current = this;
     try {
@@ -25281,6 +26452,7 @@ var ReactDOM = mapObject({
 
   // SVG
   circle: 'circle',
+  clipPath: 'clipPath',
   defs: 'defs',
   ellipse: 'ellipse',
   g: 'g',
@@ -25432,11 +26604,13 @@ function assertValidProps(props) {
       'Can only set one of `children` or `props.dangerouslySetInnerHTML`.'
     ) : invariant(props.children == null));
     ("production" !== process.env.NODE_ENV ? invariant(
-      props.dangerouslySetInnerHTML.__html != null,
+      typeof props.dangerouslySetInnerHTML === 'object' &&
+      '__html' in props.dangerouslySetInnerHTML,
       '`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`. ' +
-      'Please visit http://fb.me/react-invariant-dangerously-set-inner-html ' +
+      'Please visit https://fb.me/react-invariant-dangerously-set-inner-html ' +
       'for more information.'
-    ) : invariant(props.dangerouslySetInnerHTML.__html != null));
+    ) : invariant(typeof props.dangerouslySetInnerHTML === 'object' &&
+    '__html' in props.dangerouslySetInnerHTML));
   }
   if ("production" !== process.env.NODE_ENV) {
     ("production" !== process.env.NODE_ENV ? warning(
@@ -28242,7 +29416,7 @@ function warnAndMonitorForKeyUse(message, element, parentType) {
 
   ("production" !== process.env.NODE_ENV ? warning(
     false,
-    message + '%s%s See http://fb.me/react-warning-keys for more information.',
+    message + '%s%s See https://fb.me/react-warning-keys for more information.',
     parentOrOwnerAddendum,
     childOwnerAddendum
   ) : null);
@@ -33063,6 +34237,7 @@ var MUST_USE_ATTRIBUTE = DOMProperty.injection.MUST_USE_ATTRIBUTE;
 
 var SVGDOMPropertyConfig = {
   Properties: {
+    clipPath: MUST_USE_ATTRIBUTE,
     cx: MUST_USE_ATTRIBUTE,
     cy: MUST_USE_ATTRIBUTE,
     d: MUST_USE_ATTRIBUTE,
@@ -33108,6 +34283,7 @@ var SVGDOMPropertyConfig = {
     y: MUST_USE_ATTRIBUTE
   },
   DOMAttributeNames: {
+    clipPath: 'clip-path',
     fillOpacity: 'fill-opacity',
     fontFamily: 'font-family',
     fontSize: 'font-size',
@@ -35920,6 +37096,7 @@ var shouldWrap = {
   // Force wrapping for SVG elements because if they get created inside a <div>,
   // they will be initialized in the wrong namespace (and will not display).
   'circle': true,
+  'clipPath': true,
   'defs': true,
   'ellipse': true,
   'g': true,
@@ -35962,6 +37139,7 @@ var markupWrap = {
   'th': trWrap,
 
   'circle': svgWrap,
+  'clipPath': svgWrap,
   'defs': svgWrap,
   'ellipse': svgWrap,
   'g': svgWrap,
@@ -37592,3 +38770,5 @@ module.exports = warning;
 module.exports = require('./lib/React');
 
 },{"./lib/React":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/lib/React.js"}]},{},["./js/src/main.js"]);
+
+//# sourceMappingURL=js/dist/app.js.map

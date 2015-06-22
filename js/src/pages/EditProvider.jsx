@@ -5,6 +5,7 @@ var ProviderTable = require('./../components/ProviderTable.jsx');
 var StoreWatchMixin = Fluxxor.StoreWatchMixin;
 var Navigation = require('react-router').Navigation;
 var EditProviderForm = require('./../components/EditProviderForm.jsx');
+var PageLayout = require('./../components/PageLayout.jsx');
 
 var EditProvider = React.createClass({
     mixins: [FluxMixin, StoreWatchMixin('EditProviderStore'), Navigation],
@@ -12,8 +13,11 @@ var EditProvider = React.createClass({
         router: React.PropTypes.func
     },
     getStateFromFlux: function () {
+        var flux = this.getFlux();
         return {
-            provider: this.getFlux().store('EditProviderStore').getProvider()
+            provider: flux.store('EditProviderStore').getProvider(),
+            loading: flux.store('EditProviderStore').isLoading(),
+            saving: flux.store('EditProviderStore').isSaving()
         }
     },
     componentDidMount: function () {
@@ -24,15 +28,16 @@ var EditProvider = React.createClass({
     },
     render: function() {
         return (
-            <div className="container">
+            <PageLayout>
                 <div>
-                    <div className="row">
-                        <div className="col-xs-6 col-xs-offset-3">
-                            <EditProviderForm provider={this.state.provider} onSaveProvider={this.saveProvider} />
-                        </div>
-                    </div>
+                    <EditProviderForm
+                    provider={this.state.provider}
+                    onSaveProvider={this.saveProvider}
+                    loading={this.state.loading}
+                    saving={this.state.saving}
+                    />
                 </div>
-            </div>
+            </PageLayout>
         );
     }
 });

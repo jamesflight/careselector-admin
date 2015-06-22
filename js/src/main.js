@@ -7,10 +7,12 @@ var actions = require('./actions.js');
 var Fluxxor = require("fluxxor");
 var BristolProvidersStore = require('./stores/BristolProvidersStore.js');
 var EditProviderStore = require('./stores/EditProviderStore.js');
+var AuthStore = require('./stores/AuthStore.js');
 
 var stores = {
     BristolProvidersStore: new BristolProvidersStore(),
-    EditProviderStore: new EditProviderStore()
+    EditProviderStore: new EditProviderStore(),
+    AuthStore: new AuthStore()
 };
 
 var flux = new Fluxxor.Flux(stores, actions);
