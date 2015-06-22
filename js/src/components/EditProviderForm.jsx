@@ -47,7 +47,7 @@ var LoginForm = React.createClass({
                     <div>
                         <br/><br/><br/>
                         <div className="text-center">
-                            <img src="/img/ajax.gif" />
+                            <img src="/careselector-admin/img/ajax.gif" />
                         </div>
                     </div>
                 }
@@ -62,7 +62,7 @@ var LoginForm = React.createClass({
                             }
                             { this.props.saving &&
                             <div className="text-center">
-                                <img src="/img/ajax.gif" />
+                                <img src="/careselector-admin/img/ajax.gif" />
                             </div>
                             }
                             <hr/>

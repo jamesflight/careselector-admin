@@ -51,7 +51,7 @@ var LoginForm = React.createClass({
 
                     { this.props.loading &&
                         <div className="text-center">
-                            <img src="/img/ajax.gif" />
+                            <img src="/careselector-admin/img/ajax.gif" />
                         </div>
                     }
 
