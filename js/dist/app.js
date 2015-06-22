@@ -523,7 +523,7 @@ var LoginForm = React.createClass({displayName: "LoginForm",
                         this.props.providers.map(function (provider) {
                             return (
                                 React.createElement("tr", null, 
-                                    React.createElement("td", null, React.createElement("span", {className: "link", onClick: this.selectProvider, "data-id": provider.id}, provider.name)), 
+                                    React.createElement("td", null, React.createElement("span", {style: {'cursor':'pointer'}, onClick: this.selectProvider, "data-id": provider.id, className: "text-primary"}, provider.name)), 
                                     React.createElement("td", null, provider.cqc_id)
                                 )
                             )

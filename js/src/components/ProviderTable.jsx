@@ -33,7 +33,7 @@ var LoginForm = React.createClass({
                         {this.props.providers.map(function (provider) {
                             return (
                                 <tr>
-                                    <td><span className="link" onClick={this.selectProvider} data-id={provider.id}>{provider.name}</span></td>
+                                    <td><span style={{'cursor':'pointer'}} onClick={this.selectProvider} data-id={provider.id} className="text-primary" >{provider.name}</span></td>
                                     <td>{provider.cqc_id}</td>
                                 </tr>
                             )
