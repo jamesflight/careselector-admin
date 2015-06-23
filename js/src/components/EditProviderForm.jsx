@@ -160,6 +160,14 @@ var LoginForm = React.createClass({
                                         }}
                                         onChange={this.updateNotes}
                                         />
+                                        <div className="form-group">
+                                            <br/>
+                                            <div class="checkbox">
+                                                <label>
+                                                    <input data-field="terms_agreed" onChange={this.updateCheckbox} checked={this.state.provider.terms_agreed} type="checkbox" /> Terms Agreed
+                                                </label>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="panel panel-green">

@@ -308,6 +308,14 @@ var LoginForm = React.createClass({displayName: "LoginForm",
                                             toolbar: 'undo redo | bold italic underline'
                                         }, 
                                         onChange: this.updateNotes}
+                                        ), 
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("br", null), 
+                                            React.createElement("div", {class: "checkbox"}, 
+                                                React.createElement("label", null, 
+                                                    React.createElement("input", {"data-field": "terms_agreed", onChange: this.updateCheckbox, checked: this.state.provider.terms_agreed, type: "checkbox"}), " Terms Agreed"
+                                                )
+                                            )
                                         )
                                     )
                                 ), 
