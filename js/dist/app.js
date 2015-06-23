@@ -51,6 +51,7 @@ var SetToken = require('./services/auth/SetToken.js');
 var GetBristolProviders = require('./services/providers/GetBristolProviders.js');
 var GetProvider = require('./services/providers/GetProvider.js');
 var SaveProvider = require('./services/providers/SaveProvider.js');
+var DeleteProvider = require('./services/providers/DeleteProvider.js');
 
 module.exports = {
     attemptAuth: function (credentials) {
@@ -81,24 +82,88 @@ module.exports = {
         SaveProvider(id, provider).then(function () {
             this.dispatch(constants.SAVE_PROVIDER_SUCCESS);
         }.bind(this));
+    },
+    deleteProvider: function (provider) {
+        this.dispatch(constants.DELETE_PROVIDER);
+
+        DeleteProvider(provider.id).then(function () {
+            this.dispatch(constants.DELETE_PROVIDER_SUCCESS);
+        }.bind(this));
     }
 };
 
-},{"./constants.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/constants.js","./services/auth/AttemptAuth.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/AttemptAuth.js","./services/auth/SetToken.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/SetToken.js","./services/providers/GetBristolProviders.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/GetBristolProviders.js","./services/providers/GetProvider.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/GetProvider.js","./services/providers/SaveProvider.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/SaveProvider.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/EditProviderForm.jsx":[function(require,module,exports){
+},{"./constants.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/constants.js","./services/auth/AttemptAuth.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/AttemptAuth.js","./services/auth/SetToken.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/SetToken.js","./services/providers/DeleteProvider.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/DeleteProvider.js","./services/providers/GetBristolProviders.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/GetBristolProviders.js","./services/providers/GetProvider.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/GetProvider.js","./services/providers/SaveProvider.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/SaveProvider.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/DeleteButton.jsx":[function(require,module,exports){
+var React = require('react');
+
+var DeleteButton = React.createClass({displayName: "DeleteButton",
+    propTypes: {
+        text: React.PropTypes.string.isRequired,
+        onDelete: React.PropTypes.func.isRequired,
+        className:React.PropTypes.string,
+        payload:React.PropTypes.object,
+        deleteing:React.PropTypes.bool.isRequired
+    },
+    getInitialState: function () {
+        return {
+            showConfimation:false
+        }
+    },
+    toggleConfirmation: function () {
+        this.setState({
+            showConfirmation: ! this.state.showConfirmation
+        });
+    },
+    actionDelete: function () {
+        this.props.onDelete(this.props.payload);
+        this.toggleConfirmation();
+    },
+    render: function(){
+        return (
+            React.createElement("span", {className: this.props.className}, 
+            ! this.props.deleteing &&
+                React.createElement("div", null, 
+                     ! this.state.showConfirmation &&
+                        React.createElement("button", {className: "btn btn-danger btn-lg", onClick: this.toggleConfirmation}, React.createElement("i", {className: "fa fa-trash fa-lg"}), " ",  this.props.text), 
+                    
+                     this.state.showConfirmation &&
+                        React.createElement("p", null, 
+                        React.createElement("span", {className: "text-muted"}, "Are you sure? "), 
+                        React.createElement("button", {onClick: this.actionDelete, className: "btn btn-danger btn-lg", style: {'marginRight':'5px'}}, "Yes"), 
+                        React.createElement("button", {onClick: this.toggleConfirmation, className: "btn btn-default btn-lg"}, "No")
+                        )
+                    
+                ), 
+            
+             this.props.deleteing &&
+                React.createElement("img", {src: "/careselector-admin/ajax.gif"})
+            
+
+
+            )
+        );
+    }
+});
+
+module.exports = DeleteButton;
+
+},{"react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/EditProviderForm.jsx":[function(require,module,exports){
 var React = require('react');
 var TinyMCE = require('react-tinymce');
 var MoneyInput = require('./MoneyInput.jsx');
+var DeleteButton = require('./DeleteButton.jsx');
 
 var LoginForm = React.createClass({displayName: "LoginForm",
     propTypes: {
         provider: React.PropTypes.object.isRequired,
         onSaveProvider: React.PropTypes.func.isRequired,
+        onDeleteProvider:React.PropTypes.func.isRequired,
         loading:React.PropTypes.bool.isRequired,
-        saving:React.PropTypes.bool.isRequired
+        saving:React.PropTypes.bool.isRequired,
+        deleteing:React.PropTypes.bool.isRequired
     },
     getInitialState: function () {
         return {
-            provider: {}
+            provider: {images:[]}
         }
     },
     componentWillReceiveProps: function (newProps) {
@@ -139,175 +204,208 @@ var LoginForm = React.createClass({displayName: "LoginForm",
                     ), 
                 
                  ! this.props.loading &&
-                    React.createElement("div", {className: "row"}, 
-                        React.createElement("div", {className: "col-xs-12"}, 
-                            React.createElement("h1", {className: "page-header"}, this.state.provider.name)
-                        ), 
-                        React.createElement("div", {className: "col-xs-12"}, 
-                             ! this.props.saving &&
-                            React.createElement("button", {className: "btn btn-lg btn-success", onClick: this.saveProvider}, React.createElement("i", {className: "fa fa-floppy-o fa-lg"}), " Save"), 
-                            
-                             this.props.saving &&
-                            React.createElement("div", {className: "text-center"}, 
-                                React.createElement("img", {src: "/careselector-admin/img/ajax.gif"})
+                    React.createElement("div", null, 
+                        React.createElement("div", {className: "row"}, 
+                            React.createElement("div", {className: "col-xs-12"}, 
+                                React.createElement("h1", {className: "page-header"}, this.state.provider.name)
                             ), 
-                            
-                            React.createElement("hr", null)
-                        ), 
-                        React.createElement("div", {className: "col-xs-4"}, 
-                            React.createElement("div", {className: "panel panel-red"}, 
-                                React.createElement("div", {className: "panel-heading"}, 
-                                "General Details"
+                            React.createElement("div", {className: "col-xs-12"}, 
+                                 ! this.props.saving &&
+                                React.createElement("button", {className: "btn btn-lg btn-success", onClick: this.saveProvider}, React.createElement("i", {className: "fa fa-floppy-o fa-lg"}), " Save"), 
+                                
+                                 this.props.saving &&
+
+                                    React.createElement("img", {src: "/careselector-admin/img/ajax.gif"}), 
+
+                                
+                                React.createElement(DeleteButton, {
+                                    onDelete: this.props.onDeleteProvider, 
+                                    text: "Delete", 
+                                    className: "pull-right", 
+                                    payload: this.state.provider, 
+                                    deleteing: this.props.deleteing}
                                 ), 
-                                React.createElement("div", {className: "panel-body"}, 
-                                    React.createElement("div", {className: "form-group"}, 
-                                        React.createElement("label", null, "Name"), 
-                                        React.createElement("input", {className: "form-control", "data-field": "name", onChange: this.updateField, value: this.state.provider.name, type: "text"})
+                                React.createElement("hr", null)
+                            ), 
+                            React.createElement("div", {className: "col-xs-4"}, 
+                                React.createElement("div", {className: "panel panel-red"}, 
+                                    React.createElement("div", {className: "panel-heading"}, 
+                                    "General Details"
                                     ), 
+                                    React.createElement("div", {className: "panel-body"}, 
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "Name"), 
+                                            React.createElement("input", {className: "form-control", "data-field": "name", onChange: this.updateField, value: this.state.provider.name, type: "text"})
+                                        ), 
 
-                                    React.createElement("div", {className: "form-group"}, 
-                                        React.createElement("label", null, "Local Authority"), 
-                                        React.createElement("input", {className: "form-control", "data-field": "local_authority", onChange: this.updateField, value: this.state.provider.local_authority, type: "text"})
-                                    ), 
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "Local Authority"), 
+                                            React.createElement("input", {className: "form-control", "data-field": "local_authority", onChange: this.updateField, value: this.state.provider.local_authority, type: "text"})
+                                        ), 
 
-                                    React.createElement("div", {className: "form-group"}, 
-                                        React.createElement("label", null, "Address"), 
-                                        React.createElement("input", {className: "form-control", "data-field": "address_1", onChange: this.updateField, value: this.state.provider.address_1, type: "text"}), 
-                                        React.createElement("input", {className: "form-control", "data-field": "address_2", onChange: this.updateField, value: this.state.provider.address_2, type: "text"}), 
-                                        React.createElement("input", {className: "form-control", "data-field": "address_3", onChange: this.updateField, value: this.state.provider.address_3, type: "text"}), 
-                                        React.createElement("input", {className: "form-control", "data-field": "address_4", onChange: this.updateField, value: this.state.provider.address_4, type: "text"})
-                                    ), 
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "Address"), 
+                                            React.createElement("input", {className: "form-control", "data-field": "address_1", onChange: this.updateField, value: this.state.provider.address_1, type: "text"}), 
+                                            React.createElement("input", {className: "form-control", "data-field": "address_2", onChange: this.updateField, value: this.state.provider.address_2, type: "text"}), 
+                                            React.createElement("input", {className: "form-control", "data-field": "address_3", onChange: this.updateField, value: this.state.provider.address_3, type: "text"}), 
+                                            React.createElement("input", {className: "form-control", "data-field": "address_4", onChange: this.updateField, value: this.state.provider.address_4, type: "text"})
+                                        ), 
 
-                                    React.createElement("div", {className: "form-group"}, 
-                                        React.createElement("label", null, "Postcode"), 
-                                        React.createElement("input", {className: "form-control", "data-field": "postcode", onChange: this.updateField, value: this.state.provider.postcode, type: "text"})
-                                    ), 
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "Postcode"), 
+                                            React.createElement("input", {className: "form-control", "data-field": "postcode", onChange: this.updateField, value: this.state.provider.postcode, type: "text"})
+                                        ), 
 
-                                    React.createElement("div", {className: "form-group"}, 
-                                        React.createElement("label", null, "Phone"), 
-                                        React.createElement("input", {className: "form-control", "data-field": "phone", onChange: this.updateField, value: this.state.provider.phone, type: "text"})
-                                    ), 
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "Phone"), 
+                                            React.createElement("input", {className: "form-control", "data-field": "phone", onChange: this.updateField, value: this.state.provider.phone, type: "text"})
+                                        ), 
 
-                                    React.createElement("div", {className: "form-group"}, 
-                                        React.createElement("label", null, "Website"), 
-                                        React.createElement("input", {className: "form-control", "data-field": "website", onChange: this.updateField, value: this.state.provider.website, type: "text"})
-                                    ), 
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "Website"), 
+                                            React.createElement("input", {className: "form-control", "data-field": "website", onChange: this.updateField, value: this.state.provider.website, type: "text"})
+                                        ), 
 
-                                    React.createElement("div", {className: "form-group"}, 
-                                        React.createElement("label", null, "Contact Name"), 
-                                        React.createElement("input", {className: "form-control", "data-field": "contact_name", onChange: this.updateField, value: this.state.provider.contact_name, type: "text"})
-                                    ), 
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "Contact Name"), 
+                                            React.createElement("input", {className: "form-control", "data-field": "contact_name", onChange: this.updateField, value: this.state.provider.contact_name, type: "text"})
+                                        ), 
 
-                                    React.createElement("div", {className: "form-group"}, 
-                                        React.createElement("label", null, "CQC Score"), 
-                                        React.createElement("input", {className: "form-control", "data-field": "cqc_score", onChange: this.updateField, value: this.state.provider.cqc_score, type: "number"})
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "CQC Score"), 
+                                            React.createElement("input", {className: "form-control", "data-field": "cqc_score", onChange: this.updateField, value: this.state.provider.cqc_score, type: "number"})
+                                        ), 
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "CQC Location Id"), 
+                                            React.createElement("input", {className: "form-control", "data-field": "cqc_location", onChange: this.updateField, value: this.state.provider.cqc_location, type: "text"})
+                                        ), 
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "Care Home Manager Name"), 
+                                            React.createElement("input", {className: "form-control", "data-field": "care_home_manager_name", onChange: this.updateField, value: this.state.provider.care_home_manager_name, type: "text"})
+                                        ), 
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "Care Home Manager Email"), 
+                                            React.createElement("input", {className: "form-control", "data-field": "care_home_manager_email", onChange: this.updateField, value: this.state.provider.care_home_manager_email, type: "text"})
+                                        ), 
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "Care Home Manager Phone"), 
+                                            React.createElement("input", {className: "form-control", "data-field": "care_home_manager_phone", onChange: this.updateField, value: this.state.provider.care_home_manager_phone, type: "text"})
+                                        )
+                                    )
+                                )
+                            ), 
+                            React.createElement("div", {className: "col-xs-8"}, 
+                                React.createElement("div", {className: "panel panel-yellow"}, 
+                                    React.createElement("div", {className: "panel-heading"}, 
+                                        "Notes"
                                     ), 
-                                    React.createElement("div", {className: "form-group"}, 
-                                        React.createElement("label", null, "CQC Location Id"), 
-                                        React.createElement("input", {className: "form-control", "data-field": "cqc_location", onChange: this.updateField, value: this.state.provider.cqc_location, type: "text"})
+                                    React.createElement("div", {className: "panel-body", key: "tinymce"}, 
+                                        React.createElement(TinyMCE, {
+                                        content: this.state.provider.notes, 
+                                        config: {
+                                            menubar:'',
+                                            plugins: '',
+                                            toolbar: 'undo redo | bold italic underline'
+                                        }, 
+                                        onChange: this.updateNotes}
+                                        )
+                                    )
+                                ), 
+                                React.createElement("div", {className: "panel panel-green"}, 
+                                    React.createElement("div", {className: "panel-heading"}, 
+                                        "Services"
                                     ), 
-                                    React.createElement("div", {className: "form-group"}, 
-                                        React.createElement("label", null, "Care Home Manager Name"), 
-                                        React.createElement("input", {className: "form-control", "data-field": "care_home_manager_name", onChange: this.updateField, value: this.state.provider.care_home_manager_name, type: "text"})
-                                    ), 
-                                    React.createElement("div", {className: "form-group"}, 
-                                        React.createElement("label", null, "Care Home Manager Email"), 
-                                        React.createElement("input", {className: "form-control", "data-field": "care_home_manager_email", onChange: this.updateField, value: this.state.provider.care_home_manager_email, type: "text"})
-                                    ), 
-                                    React.createElement("div", {className: "form-group"}, 
-                                        React.createElement("label", null, "Care Home Manager Phone"), 
-                                        React.createElement("input", {className: "form-control", "data-field": "care_home_manager_phone", onChange: this.updateField, value: this.state.provider.care_home_manager_phone, type: "text"})
+                                    React.createElement("div", {className: "panel-body"}, 
+                                        React.createElement("div", {className: "form-group"}, 
+                                            React.createElement("label", null, "Service Type"), 
+                                            React.createElement("select", {className: "form-control", onChange: this.updateField, "data-field": "service_type", value: this.state.provider.service_type}, 
+                                                React.createElement("option", {value: "CARE_HOME"}, "Care Home"), 
+                                                React.createElement("option", {value: "NURSING_HOME"}, "Nursing Home"), 
+                                                React.createElement("option", {value: "HOME_CARE"}, "Home Care")
+                                            )
+                                        ), 
+                                        React.createElement("div", {className: "form-group"}, 
+
+                                            React.createElement("label", null, "Specialisms"), 
+                                            React.createElement("div", {class: "checkbox"}, 
+                                                React.createElement("label", null, 
+                                                    React.createElement("input", {"data-field": "service_under_65", onChange: this.updateCheckbox, checked: this.state.provider.service_under_65, type: "checkbox"}), " Under 65"
+                                                )
+                                            ), 
+                                            React.createElement("div", {class: "checkbox"}, 
+                                                React.createElement("label", null, 
+                                                    React.createElement("input", {"data-field": "service_over_65", onChange: this.updateCheckbox, checked: this.state.provider.service_over_65, type: "checkbox"}), " Over 65"
+                                                )
+                                            ), 
+                                            React.createElement("div", {class: "checkbox"}, 
+                                                React.createElement("label", null, 
+                                                    React.createElement("input", {"data-field": "service_dementia", onChange: this.updateCheckbox, checked: this.state.provider.service_dementia, type: "checkbox"}), " Dementia"
+                                                )
+                                            ), 
+                                            React.createElement("div", {class: "checkbox"}, 
+                                                React.createElement("label", null, 
+                                                    React.createElement("input", {"data-field": "service_learning_disability", onChange: this.updateCheckbox, checked: this.state.provider.service_learning_disability, type: "checkbox"}), " Learning Disability"
+                                                )
+                                            ), 
+                                            React.createElement("div", {class: "checkbox"}, 
+                                                React.createElement("label", null, 
+                                                    React.createElement("input", {"data-field": "service_physical_disability", onChange: this.updateCheckbox, checked: this.state.provider.service_physical_disability, type: "checkbox"}), " Physical Disability"
+                                                )
+                                            ), 
+                                            React.createElement("div", {class: "checkbox"}, 
+                                                React.createElement("label", null, 
+                                                    React.createElement("input", {"data-field": "service_sensory_impairment", onChange: this.updateCheckbox, checked: this.state.provider.service_sensory_impairment, type: "checkbox"}), " Sensory Impairment"
+                                                )
+                                            ), 
+                                            React.createElement("div", {class: "checkbox"}, 
+                                                React.createElement("label", null, 
+                                                    React.createElement("input", {"data-field": "service_mental_health", onChange: this.updateCheckbox, checked: this.state.provider.service_mental_health, type: "checkbox"}), " Mental Health"
+                                                )
+                                            ), 
+                                            React.createElement("div", {class: "checkbox"}, 
+                                                React.createElement("label", null, 
+                                                    React.createElement("input", {"data-field": "service_substance_misuse", onChange: this.updateCheckbox, checked: this.state.provider.service_substance_misuse, type: "checkbox"}), " Substance Misuse"
+                                                )
+                                            ), 
+
+                                            React.createElement("div", {className: "form-group"}, 
+                                                React.createElement("label", null, "Total Beds"), 
+                                                React.createElement("input", {className: "form-control", "data-field": "total_beds", onChange: this.updateField, value: this.state.provider.total_beds, type: "number"})
+                                            ), 
+
+                                            React.createElement("div", {className: "form-group"}, 
+                                                React.createElement("label", null, "Availability"), 
+                                                React.createElement("input", {className: "form-control", "data-field": "availability", onChange: this.updateField, value: this.state.provider.availability, type: "text"})
+                                            ), 
+
+                                            React.createElement("div", {className: "form-group"}, 
+                                                React.createElement("label", null, "Price"), 
+                                                React.createElement(MoneyInput, {className: "form-control", onChange: this.updatePrice, value: this.state.provider.price})
+                                            )
+                                        )
                                     )
                                 )
                             )
                         ), 
-                        React.createElement("div", {className: "col-xs-8"}, 
-                            React.createElement("div", {className: "panel panel-yellow"}, 
-                                React.createElement("div", {className: "panel-heading"}, 
-                                    "Notes"
-                                ), 
-                                React.createElement("div", {className: "panel-body", key: "tinymce"}, 
-                                    React.createElement(TinyMCE, {
-                                    content: this.state.provider.notes, 
-                                    config: {
-                                        menubar:'',
-                                        plugins: '',
-                                        toolbar: 'undo redo | bold italic underline'
-                                    }, 
-                                    onChange: this.updateNotes}
-                                    )
-                                )
-                            ), 
-                            React.createElement("div", {className: "panel panel-green"}, 
-                                React.createElement("div", {className: "panel-heading"}, 
-                                    "Services"
-                                ), 
-                                React.createElement("div", {className: "panel-body"}, 
-                                    React.createElement("div", {className: "form-group"}, 
-                                        React.createElement("label", null, "Service Type"), 
-                                        React.createElement("select", {className: "form-control", onChange: this.updateField, "data-field": "service_type", value: this.state.provider.service_type}, 
-                                            React.createElement("option", {value: "CARE_HOME"}, "Care Home"), 
-                                            React.createElement("option", {value: "NURSING_HOME"}, "Nursing Home"), 
-                                            React.createElement("option", {value: "HOME_CARE"}, "Home Care")
-                                        )
+                        React.createElement("div", {className: "row"}, 
+                            React.createElement("div", {className: "col-xs-12"}, 
+                                React.createElement("div", {className: "panel panel-yellow"}, 
+                                    React.createElement("div", {className: "panel-heading"}, 
+                                        "Images"
                                     ), 
-                                    React.createElement("div", {className: "form-group"}, 
-
-                                        React.createElement("label", null, "Specialisms"), 
-                                        React.createElement("div", {class: "checkbox"}, 
-                                            React.createElement("label", null, 
-                                                React.createElement("input", {"data-field": "service_under_65", onChange: this.updateCheckbox, checked: this.state.provider.service_under_65, type: "checkbox"}), " Under 65"
-                                            )
-                                        ), 
-                                        React.createElement("div", {class: "checkbox"}, 
-                                            React.createElement("label", null, 
-                                                React.createElement("input", {"data-field": "service_over_65", onChange: this.updateCheckbox, checked: this.state.provider.service_over_65, type: "checkbox"}), " Over 65"
-                                            )
-                                        ), 
-                                        React.createElement("div", {class: "checkbox"}, 
-                                            React.createElement("label", null, 
-                                                React.createElement("input", {"data-field": "service_dementia", onChange: this.updateCheckbox, checked: this.state.provider.service_dementia, type: "checkbox"}), " Dementia"
-                                            )
-                                        ), 
-                                        React.createElement("div", {class: "checkbox"}, 
-                                            React.createElement("label", null, 
-                                                React.createElement("input", {"data-field": "service_learning_disability", onChange: this.updateCheckbox, checked: this.state.provider.service_learning_disability, type: "checkbox"}), " Learning Disability"
-                                            )
-                                        ), 
-                                        React.createElement("div", {class: "checkbox"}, 
-                                            React.createElement("label", null, 
-                                                React.createElement("input", {"data-field": "service_physical_disability", onChange: this.updateCheckbox, checked: this.state.provider.service_physical_disability, type: "checkbox"}), " Physical Disability"
-                                            )
-                                        ), 
-                                        React.createElement("div", {class: "checkbox"}, 
-                                            React.createElement("label", null, 
-                                                React.createElement("input", {"data-field": "service_sensory_impairment", onChange: this.updateCheckbox, checked: this.state.provider.service_sensory_impairment, type: "checkbox"}), " Sensory Impairment"
-                                            )
-                                        ), 
-                                        React.createElement("div", {class: "checkbox"}, 
-                                            React.createElement("label", null, 
-                                                React.createElement("input", {"data-field": "service_mental_health", onChange: this.updateCheckbox, checked: this.state.provider.service_mental_health, type: "checkbox"}), " Mental Health"
-                                            )
-                                        ), 
-                                        React.createElement("div", {class: "checkbox"}, 
-                                            React.createElement("label", null, 
-                                                React.createElement("input", {"data-field": "service_substance_misuse", onChange: this.updateCheckbox, checked: this.state.provider.service_substance_misuse, type: "checkbox"}), " Substance Misuse"
-                                            )
-                                        ), 
-
-                                        React.createElement("div", {className: "form-group"}, 
-                                            React.createElement("label", null, "Total Beds"), 
-                                            React.createElement("input", {className: "form-control", "data-field": "total_beds", onChange: this.updateField, value: this.state.provider.total_beds, type: "number"})
-                                        ), 
-
-                                        React.createElement("div", {className: "form-group"}, 
-                                            React.createElement("label", null, "Availability"), 
-                                            React.createElement("input", {className: "form-control", "data-field": "availability", onChange: this.updateField, value: this.state.provider.availability, type: "text"})
-                                        ), 
-
-                                        React.createElement("div", {className: "form-group"}, 
-                                            React.createElement("label", null, "Price"), 
-                                            React.createElement(MoneyInput, {className: "form-control", onChange: this.updatePrice, value: this.state.provider.price})
+                                    React.createElement("div", {className: "panel-body"}, 
+                                         
+                                             this.state.provider.images.map(function (image) {
+                                                 return (
+                                                     React.createElement("img", {src: image.thumbnail_url, style: {'border':'solid 1px #ccc'}})
+                                                 )
+                                             }), 
+                                         
+                                        React.createElement("br", null), React.createElement("br", null), 
+                                        React.createElement("div", {className: "well text-center text-muted"}, 
+                                            React.createElement("br", null), 
+                                            "Drag and drop images to upload here, or click to browse your files.", 
+                                            React.createElement("br", null), React.createElement("br", null)
                                         )
                                     )
                                 )
@@ -322,7 +420,7 @@ var LoginForm = React.createClass({displayName: "LoginForm",
 
 module.exports = LoginForm;
 
-},{"./MoneyInput.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/MoneyInput.jsx","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-tinymce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/lib/main.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/Example.jsx":[function(require,module,exports){
+},{"./DeleteButton.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/DeleteButton.jsx","./MoneyInput.jsx":"/Users/user/PhpstormProjects/careselector-admin/js/src/components/MoneyInput.jsx","react":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react/react.js","react-tinymce":"/Users/user/PhpstormProjects/careselector-admin/node_modules/react-tinymce/lib/main.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/components/Example.jsx":[function(require,module,exports){
 var React = require('react');
 var Navigation = require('react-router').Navigation;
 var Fluxxor = require('fluxxor');
@@ -557,7 +655,9 @@ module.exports = {
     LOAD_PROVIDER_FOR_EDITING:"LOAD_PROVIDER_FOR_EDITING",
     LOAD_PROVIDER_FOR_EDITING_SUCCESS:"LOAD_PROVIDER_FOR_EDITING_SUCCESS",
     SAVE_PROVIDER:"SAVE_PROVIDER",
-    SAVE_PROVIDER_SUCCESS:"SAVE_PROVIDER_SUCCESS"
+    SAVE_PROVIDER_SUCCESS:"SAVE_PROVIDER_SUCCESS",
+    DELETE_PROVIDER:"DELETE_PROVIDER",
+    DELETE_PROVIDER_SUCCESS:"DELETE_PROVIDER_SUCCESS"
 };
 
 },{}],"/Users/user/PhpstormProjects/careselector-admin/js/src/pages/EditProvider.jsx":[function(require,module,exports){
@@ -580,7 +680,14 @@ var EditProvider = React.createClass({displayName: "EditProvider",
         return {
             provider: flux.store('EditProviderStore').getProvider(),
             loading: flux.store('EditProviderStore').isLoading(),
-            saving: flux.store('EditProviderStore').isSaving()
+            saving: flux.store('EditProviderStore').isSaving(),
+            deleteing: flux.store('EditProviderStore').isDeleteing(),
+            deleted: flux.store('EditProviderStore').isDeleted()
+        }
+    },
+    componentWillUpdate: function (newProps, newState) {
+        if (newState.deleted === true) {
+            this.transitionTo('Index');
         }
     },
     componentDidMount: function () {
@@ -589,15 +696,20 @@ var EditProvider = React.createClass({displayName: "EditProvider",
     saveProvider: function (provider) {
         this.getFlux().actions.saveProvider(this.context.router.getCurrentParams().id, provider);
     },
+    deleteProvider:function (provider) {
+        this.getFlux().actions.deleteProvider(provider);
+    },
     render: function() {
         return (
             React.createElement(PageLayout, null, 
                 React.createElement("div", null, 
                     React.createElement(EditProviderForm, {
-                    provider: this.state.provider, 
-                    onSaveProvider: this.saveProvider, 
-                    loading: this.state.loading, 
-                    saving: this.state.saving}
+                        provider: this.state.provider, 
+                        onSaveProvider: this.saveProvider, 
+                        loading: this.state.loading, 
+                        saving: this.state.saving, 
+                        deleteing: this.state.deleteing, 
+                        onDeleteProvider: this.deleteProvider}
                     )
                 )
             )
@@ -760,7 +872,16 @@ module.exports = function (token) {
     localStorage.setItem('token', token);
 };
 
-},{}],"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/GetBristolProviders.js":[function(require,module,exports){
+},{}],"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/DeleteProvider.js":[function(require,module,exports){
+var qwest = require('qwest');
+var config = require('./../../config.js');
+var GetHeaders = require('./../auth/GetHeaders.js');
+
+module.exports = function (id) {
+    return qwest.delete(config.API_URL + 'providers/' + id, {}, {headers:GetHeaders()});
+};
+
+},{"./../../config.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/config.js","./../auth/GetHeaders.js":"/Users/user/PhpstormProjects/careselector-admin/js/src/services/auth/GetHeaders.js","qwest":"/Users/user/PhpstormProjects/careselector-admin/node_modules/qwest/src/qwest.js"}],"/Users/user/PhpstormProjects/careselector-admin/js/src/services/providers/GetBristolProviders.js":[function(require,module,exports){
 var qwest = require('qwest');
 var config = require('./../../config.js');
 var GetHeaders = require('./../auth/GetHeaders.js');
@@ -862,19 +983,24 @@ var constants = require('./../constants.js');
 
 module.exports = Fluxxor.createStore({
     initialize: function () {
-        this.provider = {};
+        this.provider = {images:[]};
         this.loading = false;
         this.saving = false;
+        this.deleteing = false;
+        this.deleted = false;
 
         this.bindActions(
             "LOAD_PROVIDER_FOR_EDITING", this.loadProvider,
             "LOAD_PROVIDER_FOR_EDITING_SUCCESS", this.loadProviderSuccess,
             "SAVE_PROVIDER", this.saveProvider,
-            "SAVE_PROVIDER_SUCCESS", this.saveProviderSuccess
+            "SAVE_PROVIDER_SUCCESS", this.saveProviderSuccess,
+            "DELETE_PROVIDER", this.deleteProvider,
+            "DELETE_PROVIDER_SUCCESS", this.deleteProviderSuccess
         );
     },
     loadProvider: function () {
         this.loading = true;
+        this.deleted = false;
         this.provider = {};
         this.emit("change");
     },
@@ -891,6 +1017,15 @@ module.exports = Fluxxor.createStore({
         this.saving = false;
         this.emit("change");
     },
+    deleteProvider: function () {
+        this.deleteing = true;
+        this.emit("change");
+    },
+    deleteProviderSuccess: function () {
+        this.deleteing = false;
+        this.deleted = true;
+        this.emit("change");
+    },
     getProvider: function () {
         return this.provider;
     },
@@ -899,6 +1034,12 @@ module.exports = Fluxxor.createStore({
     },
     isSaving: function () {
         return this.saving;
+    },
+    isDeleteing: function () {
+        return this.deleteing;
+    },
+    isDeleted: function () {
+        return this.deleted;
     }
 });
 

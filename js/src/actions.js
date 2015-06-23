@@ -4,6 +4,7 @@ var SetToken = require('./services/auth/SetToken.js');
 var GetBristolProviders = require('./services/providers/GetBristolProviders.js');
 var GetProvider = require('./services/providers/GetProvider.js');
 var SaveProvider = require('./services/providers/SaveProvider.js');
+var DeleteProvider = require('./services/providers/DeleteProvider.js');
 
 module.exports = {
     attemptAuth: function (credentials) {
@@ -33,6 +34,13 @@ module.exports = {
         this.dispatch(constants.SAVE_PROVIDER);
         SaveProvider(id, provider).then(function () {
             this.dispatch(constants.SAVE_PROVIDER_SUCCESS);
+        }.bind(this));
+    },
+    deleteProvider: function (provider) {
+        this.dispatch(constants.DELETE_PROVIDER);
+
+        DeleteProvider(provider.id).then(function () {
+            this.dispatch(constants.DELETE_PROVIDER_SUCCESS);
         }.bind(this));
     }
 };

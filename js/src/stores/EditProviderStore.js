@@ -3,19 +3,24 @@ var constants = require('./../constants.js');
 
 module.exports = Fluxxor.createStore({
     initialize: function () {
-        this.provider = {};
+        this.provider = {images:[]};
         this.loading = false;
         this.saving = false;
+        this.deleteing = false;
+        this.deleted = false;
 
         this.bindActions(
             "LOAD_PROVIDER_FOR_EDITING", this.loadProvider,
             "LOAD_PROVIDER_FOR_EDITING_SUCCESS", this.loadProviderSuccess,
             "SAVE_PROVIDER", this.saveProvider,
-            "SAVE_PROVIDER_SUCCESS", this.saveProviderSuccess
+            "SAVE_PROVIDER_SUCCESS", this.saveProviderSuccess,
+            "DELETE_PROVIDER", this.deleteProvider,
+            "DELETE_PROVIDER_SUCCESS", this.deleteProviderSuccess
         );
     },
     loadProvider: function () {
         this.loading = true;
+        this.deleted = false;
         this.provider = {};
         this.emit("change");
     },
@@ -32,6 +37,15 @@ module.exports = Fluxxor.createStore({
         this.saving = false;
         this.emit("change");
     },
+    deleteProvider: function () {
+        this.deleteing = true;
+        this.emit("change");
+    },
+    deleteProviderSuccess: function () {
+        this.deleteing = false;
+        this.deleted = true;
+        this.emit("change");
+    },
     getProvider: function () {
         return this.provider;
     },
@@ -40,5 +54,11 @@ module.exports = Fluxxor.createStore({
     },
     isSaving: function () {
         return this.saving;
+    },
+    isDeleteing: function () {
+        return this.deleteing;
+    },
+    isDeleted: function () {
+        return this.deleted;
     }
 });

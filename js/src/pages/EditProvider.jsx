@@ -17,7 +17,14 @@ var EditProvider = React.createClass({
         return {
             provider: flux.store('EditProviderStore').getProvider(),
             loading: flux.store('EditProviderStore').isLoading(),
-            saving: flux.store('EditProviderStore').isSaving()
+            saving: flux.store('EditProviderStore').isSaving(),
+            deleteing: flux.store('EditProviderStore').isDeleteing(),
+            deleted: flux.store('EditProviderStore').isDeleted()
+        }
+    },
+    componentWillUpdate: function (newProps, newState) {
+        if (newState.deleted === true) {
+            this.transitionTo('Index');
         }
     },
     componentDidMount: function () {
@@ -26,15 +33,20 @@ var EditProvider = React.createClass({
     saveProvider: function (provider) {
         this.getFlux().actions.saveProvider(this.context.router.getCurrentParams().id, provider);
     },
+    deleteProvider:function (provider) {
+        this.getFlux().actions.deleteProvider(provider);
+    },
     render: function() {
         return (
             <PageLayout>
                 <div>
                     <EditProviderForm
-                    provider={this.state.provider}
-                    onSaveProvider={this.saveProvider}
-                    loading={this.state.loading}
-                    saving={this.state.saving}
+                        provider={this.state.provider}
+                        onSaveProvider={this.saveProvider}
+                        loading={this.state.loading}
+                        saving={this.state.saving}
+                        deleteing={this.state.deleteing}
+                        onDeleteProvider={this.deleteProvider}
                     />
                 </div>
             </PageLayout>
