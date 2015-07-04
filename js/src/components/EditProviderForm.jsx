@@ -2,6 +2,7 @@ var React = require('react');
 var TinyMCE = require('react-tinymce');
 var MoneyInput = require('./MoneyInput.jsx');
 var DeleteButton = require('./DeleteButton.jsx');
+var ImageInput = require('./ImageInput.jsx');
 
 var LoginForm = React.createClass({
     propTypes: {
@@ -10,7 +11,10 @@ var LoginForm = React.createClass({
         onDeleteProvider:React.PropTypes.func.isRequired,
         loading:React.PropTypes.bool.isRequired,
         saving:React.PropTypes.bool.isRequired,
-        deleteing:React.PropTypes.bool.isRequired
+        deleteing:React.PropTypes.bool.isRequired,
+        onUploadImage:React.PropTypes.func.isRequired,
+        loadingImage:React.PropTypes.bool.isRequired,
+        goToImage:React.PropTypes.func.isRequired
     },
     getInitialState: function () {
         return {
@@ -42,6 +46,13 @@ var LoginForm = React.createClass({
     },
     saveProvider: function () {
         this.props.onSaveProvider(this.state.provider);
+    },
+    onUploadImage: function (obj) {
+        this.props.onUploadImage(obj);
+    },
+    goToImage: function(event) {
+        console.log('adf');
+        this.props.goToImage(event.target.dataset.id);
     },
     render: function(){
         return (
@@ -246,6 +257,7 @@ var LoginForm = React.createClass({
                                 </div>
                             </div>
                         </div>
+
                         <div className="row">
                             <div className="col-xs-12">
                                 <div className="panel panel-yellow">
@@ -256,16 +268,20 @@ var LoginForm = React.createClass({
                                          {
                                              this.state.provider.images.map(function (image) {
                                                  return (
-                                                     <img src={image.thumbnail_url} style={{'border':'solid 1px #ccc'}} />
+                                                        <img data-id={image.id} onClick={this.goToImage} src={image.thumbnail_url} style={{'border':'solid 1px #ccc','cursor':'pointer'}} />
                                                  )
-                                             })
+                                             }.bind(this))
                                          }
-                                        <br/><br/>
-                                        <div className="well text-center text-muted">
-                                            <br/>
-                                            Drag and drop images to upload here, or click to browse your files.
-                                            <br/><br/>
+                                        {!this.props.loadingImage &&
+                                        <ImageInput onSelect={this.onUploadImage} />
+                                        }
+                                        { this.props.loadingImage &&
+                                        <div>
+                                            <div className="text-center">
+                                                <img src="/careselector-admin/img/ajax.gif" />
+                                            </div>
                                         </div>
+                                            }
                                     </div>
                                 </div>
                             </div>

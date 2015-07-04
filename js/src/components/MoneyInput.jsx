@@ -18,13 +18,11 @@ var MoneyInput = React.createClass({
     },
     changeAmount: function (e) {
         var val = e.target.value;
-
         this.setState({
             amount: val
         });
         e.target.value = Math.floor(val * 100);
         this.props.onChange(e);
-
     },
     render: function(){
         return (

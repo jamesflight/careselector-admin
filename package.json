@@ -36,9 +36,12 @@
     "q": "^1.4.1",
     "qwest": "^1.7.0",
     "gulp-streamify": "0.0.5",
-    "react-tinymce": "^0.2.1"
+    "react-tinymce": "^0.2.1",
+    "react-avatar-editor": "^1.2.3",
+    "react-avatar-cropper": "0.0.3"
   },
   "dependencies": {
-    "pushstate-server": "^1.6.0"
+    "pushstate-server": "^1.6.0",
+    "react-bootstrap": "^0.23.5"
   }
 }

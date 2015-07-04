@@ -5,6 +5,7 @@ module.exports = Fluxxor.createStore({
     initialize: function () {
         this.provider = {images:[]};
         this.loading = false;
+        this.loadingImage = false;
         this.saving = false;
         this.deleteing = false;
         this.deleted = false;
@@ -15,7 +16,9 @@ module.exports = Fluxxor.createStore({
             "SAVE_PROVIDER", this.saveProvider,
             "SAVE_PROVIDER_SUCCESS", this.saveProviderSuccess,
             "DELETE_PROVIDER", this.deleteProvider,
-            "DELETE_PROVIDER_SUCCESS", this.deleteProviderSuccess
+            "DELETE_PROVIDER_SUCCESS", this.deleteProviderSuccess,
+            "UPLOAD_PROVIDER_IMAGE", this.uploadProviderImage,
+            "UPLOAD_PROVIDER_IMAGE_SUCCESS", this.uploadProviderImageSuccess
         );
     },
     loadProvider: function () {
@@ -46,6 +49,14 @@ module.exports = Fluxxor.createStore({
         this.deleted = true;
         this.emit("change");
     },
+    uploadProviderImage: function () {
+        this.loadingImage = true;
+        this.emit("change");
+    },
+    uploadProviderImageSuccess: function () {
+        this.loadingImage = false;
+        this.emit("change");
+    },
     getProvider: function () {
         return this.provider;
     },
@@ -60,5 +71,8 @@ module.exports = Fluxxor.createStore({
     },
     isDeleted: function () {
         return this.deleted;
+    },
+    isLoadingImage: function () {
+        return this.loadingImage;
     }
 });
